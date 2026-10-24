@@ -106,10 +106,10 @@ ${b.wa?`<a class="wa" target="_blank" rel="noopener" href="https://wa.me/${wal(b
 ${ledger(S,j,paid)}`;
   planInit();const cp=$('#cp');if(cp)cp.onclick=()=>{navigator.clipboard?.writeText($('#rk').textContent).then(()=>{cp.textContent='Tersalin ✓';setTimeout(()=>cp.textContent='Salin',2000)})};
   $('#f').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target),fm=$('#fm'),sb=$('#sb'),file=f.get('foto');sb.disabled=true;sb.textContent='Mengirim…';fm.innerHTML='';
-    try{const blob=await shrink(file,1400),path=b.id+'/'+j.id+'-'+Date.now()+'.jpg',u=await SB.storage.from('bukti-tf').upload(path,blob,{contentType:'image/jpeg'});if(u.error)throw u.error;
+    let path='',up=false;try{const blob=await shrink(file,1400);path=b.id+'/'+j.id+'-'+Date.now()+'.jpg';const u=await SB.storage.from('bukti-tf').upload(path,blob,{contentType:'image/jpeg'});if(u.error)throw u.error;up=true;
       const r=await SB.rpc('jamaah_kirim',{p_token:TK,p_v:+f.get('v'),p_tgl:f.get('tgl'),p_m:f.get('m'),p_bukti:path});if(r.error)throw r.error;
       await load();const m=$('#fm');if(m)m.innerHTML='<div class="ok">✓ Jazakumullahu khairan. Bukti transfer terkirim dan menunggu konfirmasi admin.</div>';$('#fm')?.scrollIntoView({behavior:'smooth',block:'center'})}
-    catch(x){fm.innerHTML='<div class="err">'+esc(x.message||'Gagal mengirim, coba lagi.')+'</div>';sb.disabled=false;sb.textContent='Kirim bukti transfer'}}}
+    catch(x){if(up)SB.storage.from('bukti-tf').remove([path]);fm.innerHTML='<div class="err">'+esc(x.message||'Gagal mengirim, coba lagi.')+'</div>';sb.disabled=false;sb.textContent='Kirim bukti transfer'}}}
 
 /* ===== Rencana pembayaran interaktif & buku tabungan ===== */
 let PLAN={mode:'bulan',n:6,k:0};
