@@ -102,6 +102,8 @@ input:focus,select:focus,textarea:focus{outline:2px solid color-mix(in srgb,var(
 .mini{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:17px}.mini .stat{min-height:98px;padding:16px 18px}.mini .statval{font-size:25px!important;margin:10px 0 2px}
 @media(max-width:1050px){.mini{grid-template-columns:repeat(2,1fr)}}
 .pad{scroll-margin-top:84px}
+td.no{color:var(--muted);font-size:11px;font-weight:600;width:1%;text-align:right;padding-right:4px;font-variant-numeric:tabular-nums}
+th:first-child{border-radius:10px 0 0 10px}
 .pager{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:14px;padding-top:14px;border-top:1px dashed #e1e9e5;font-size:12px;color:var(--muted)}
 .pager .pn{display:flex;gap:5px;align-items:center;flex-wrap:wrap}
 .pager button.pgb{min-width:34px;height:34px;padding:0 10px;border:1px solid var(--line);border-radius:10px;background:#fff;color:#46645a;font-size:12px;font-weight:600}
@@ -137,7 +139,7 @@ t:[...[5,4,3,2,1,0].flatMap((k,i)=>[{j:'UMR-2026-0001',v:2e6+i*5e5},{j:'UMR-2026
 const Store={load(){try{return JSON.parse(localStorage.getItem(KEY))}catch(e){return null}},save(){try{localStorage.setItem(KEY,JSON.stringify(D))}catch(e){msg('Gagal menyimpan data')}}};
 let D={s:{biro:'',tag:'',logo:'',admin:'',peran:'',warna:'#0d5b4c',target:0,tahun:2027},p:[],j:[],t:[]},cur='home',q='',LERR='',IS_OWNER=false;
 /* ===== Helper hitung ===== */
-const ok=()=>D.t.filter(x=>x.st=='ok'&&!x.void),tot=()=>ok().reduce((a,x)=>a+x.v,0),paid=id=>ok().filter(x=>x.j==id).reduce((a,x)=>a+x.v,0);
+const ok=()=>D.t.filter(x=>x.st=='ok'&&!x.void),tot=()=>ok().reduce((a,x)=>a+x.v,0),paid=id=>{if(!_pc||_pc.t!==D.t){_pc={t:D.t,m:{}};ok().forEach(x=>{_pc.m[x.j]=(_pc.m[x.j]||0)+x.v})}return _pc.m[id]||0};let _pc=null;
 const J=id=>D.j.find(x=>x.id==id),P=id=>D.p.find(x=>x.id==id),nid=()=>'UMR-'+new Date().getFullYear()+'-'+String(1+Math.max(0,...D.j.map(x=>+x.id.split('-')[2]||0))).padStart(4,'0');
 function months(){const r=[];for(let i=5;i>=0;i--){const d=new Date();d.setDate(1);d.setMonth(d.getMonth()-i);const k=iso(d).slice(0,7);r.push({l:d.toLocaleDateString('id-ID',{month:'short'}),v:ok().filter(x=>x.tgl.startsWith(k)).reduce((a,x)=>a+x.v,0)})}return r}
 function dark(h,f){const n=parseInt(h.slice(1),16);return '#'+[n>>16,n>>8&255,n&255].map(c=>Math.round(c*f).toString(16).padStart(2,'0')).join('')}
@@ -261,11 +263,11 @@ const hl=i=>i.dep?(i.dLeft<0?'sudah lewat':'H-'+i.dLeft):'';
 const urg=i=>i.sisa==0&&i.p?1e9:i.dLeft==null?1e8:i.dLeft;
 jrows=function(){const k=q.toLowerCase();let l=D.j.filter(j=>(j.n+j.id).toLowerCase().includes(k)).map(j=>({j,i:jinfo(j)}));
 if(SORT=='sisa')l.sort((a,b)=>b.i.sisa-a.i.sisa);else if(SORT=='mendesak')l.sort((a,b)=>urg(a.i)-urg(b.i));
-const pg=pager('jamaah',l.length);return tbl(['Jamaah','Paket / berangkat','Terkumpul','Sisa','Perlu / bulan','Progres','Status',''],l.slice(pg.s,pg.e).map(({j,i})=>`<tr><td><div class="person"><span class="miniava">${esc(ini(j.n))}</span><span><b>${esc(j.n)}</b><small>${esc(j.id)}${j.hp?' · '+esc(j.hp):''}</small></span></div></td>
+const pg=pager('jamaah',l.length);return tbl(['No','Jamaah','Paket / berangkat','Terkumpul','Sisa','Perlu / bulan','Progres','Status',''],nr(l.slice(pg.s,pg.e).map(({j,i})=>`<tr><td><div class="person"><span class="miniava">${esc(ini(j.n))}</span><span><b>${esc(j.n)}</b><small>${esc(j.id)}${j.hp?' · '+esc(j.hp):''}</small></span></div></td>
 <td>${esc(i.p?.n||'-')}<small style="display:block;color:#8a9a94;font-size:10px;margin-top:3px">${i.dep?fd(iso(i.dep))+' · '+hl(i):esc(i.p?.ber||'')}</small></td>
 <td class="amount">${rp(i.pd)}</td><td class="sisa ${i.p&&i.sisa==0?'ok':''}">${i.p?(i.sisa>0?rp(i.sisa):'Lunas'):'-'}</td><td>${i.need!=null?rp(i.need):'-'}</td>
 <td><div class="bar2"><span style="width:${i.pc}%"></span></div><span class="pct">${i.pc.toFixed(0)}%</span></td><td><span class="status ${i.st[1]}">${i.st[0]}</span></td>
-<td><button class="linkbtn" data-act="addT" data-id="${j.id}">Setor</button> <button class="linkbtn" data-act="link" data-id="${j.id}">Tautan</button> ${i.sisa>0?`<button class="linkbtn" data-act="ingat" data-id="${j.id}">Ingatkan</button> `:''}<button class="linkbtn danger" data-act="delJ" data-id="${j.id}">Hapus</button></td></tr>`).join(''))+pg.html};
+<td><button class="linkbtn" data-act="addT" data-id="${j.id}">Setor</button> <button class="linkbtn" data-act="link" data-id="${j.id}">Tautan</button> ${i.sisa>0?`<button class="linkbtn" data-act="ingat" data-id="${j.id}">Ingatkan</button> `:''}<button class="linkbtn danger" data-act="delJ" data-id="${j.id}">Hapus</button></td></tr>`),pg.s))+pg.html};
 V.jamaah=function(){const L=D.j.map(jinfo),sis=L.reduce((a,i)=>a+i.sisa,0),lunas=L.filter(i=>i.p&&i.hg>0&&i.sisa==0).length,mep=L.filter(i=>i.sisa>0&&i.dLeft!==null&&i.dLeft<=60).length,rata=L.length?L.reduce((a,i)=>a+i.pc,0)/L.length:0;
 const c=(a,v,f)=>`<article class="card stat"><div class="stathead">${a}</div><div class="statval">${v}</div><div class="statfoot">${f}</div></article>`;
 return head('Data Jamaah',D.j.length+' jamaah terdaftar','<button class="primary" data-act="addJ">＋ Tambah jamaah</button>')+`<section class="mini">${c('Total sisa tagihan',sh(sis),'belum dibayar seluruh jamaah')}${c('Sudah lunas',lunas,'dari '+D.j.length+' jamaah')}${c('Segera berangkat',mep,'belum lunas, ≤ 60 hari')}${c('Rata-rata progres',rata.toFixed(0)+'%','seluruh jamaah')}</section>
@@ -298,6 +300,8 @@ if(w)window.open('https://wa.me/'+w+'?text='+encodeURIComponent(t),'_blank');els
 let PS=15;try{PS=+localStorage.getItem('umroh_ps')||15}catch(e){}
 if(![10,15,25,50,100].includes(PS))PS=15;
 const PG={jamaah:1,setoran:1,laporan:1};
+/* sisipkan kolom nomor urut (lanjut antarhalaman) di awal tiap baris */
+const nr=(a,s)=>a.map((h,i)=>h.replace(/^<tr([^>]*)>/,`<tr$1><td class="no">${s+i+1}</td>`)).join('');
 function pager(key,total){const pages=Math.max(1,Math.ceil(total/PS));let p=Math.min(Math.max(1,PG[key]||1),pages);PG[key]=p;
 const s=(p-1)*PS,e=Math.min(total,p*PS);if(!total)return{s:0,e:0,html:''};
 const nums=[];for(let i=1;i<=pages;i++){if(i==1||i==pages||Math.abs(i-p)<=1)nums.push(i);else if(nums[nums.length-1]!=='…')nums.push('…')}
@@ -305,10 +309,10 @@ const b=(n,lb,dis,on)=>`<button type="button" class="pgb ${on?'on':''}" ${dis?'d
 const ctrl=pages>1?`<div class="pn">${b(p-1,'‹ Sebelumnya',p==1)}${nums.map(n=>n==='…'?'<span class="dots">…</span>':b(n,n,false,n==p)).join('')}${b(p+1,'Berikutnya ›',p==pages)}</div>`:'<div></div>';
 return{s,e,html:`<div class="pager"><span>Menampilkan <b>${s+1}–${e}</b> dari <b>${total}</b> data<select onchange="A.ps(this.value)">${[10,15,25,50,100].map(n=>`<option value="${n}" ${n==PS?'selected':''}>${n} / halaman</option>`).join('')}</select></span>${ctrl}</div>`}}
 function strows(){const l=[...D.t].sort((a,b)=>b.tgl.localeCompare(a.tgl)||String(b.id).localeCompare(String(a.id))),pg=pager('setoran',l.length);
-return tbl(['Jamaah','Tanggal','Metode','Nominal','Status',''],l.slice(pg.s,pg.e).map(x=>trow(x,1)).join(''))+pg.html}
+return tbl(['No','Jamaah','Tanggal','Metode','Nominal','Status',''],nr(l.slice(pg.s,pg.e).map(x=>trow(x,1)),pg.s))+pg.html}
 V.setoran=function(){return head('Tabungan','Seluruh setoran jamaah','<button class="primary" data-act="addT">＋ Catat setoran</button>')+`<div class="card pad" id="stc"><div id="st">${strows()}</div></div>`};
 V.laporan=function(){const rows=D.p.map(p=>{const js=D.j.filter(j=>j.paket==p.id),tg=js.reduce((a,j)=>a+(j.harga??p.harga),0),tr=js.reduce((a,j)=>a+paid(j.id),0);return `<tr><td><b>${esc(p.n)}</b></td><td>${js.length}</td><td class="amount">${rp(tg)}</td><td class="amount">${rp(tr)}</td><td class="amount">${rp(Math.max(0,tg-tr))}</td></tr>`}),pg=pager('laporan',rows.length);
-return head('Laporan','Rekap per paket & ekspor data (CSV berisi seluruh data, bukan hanya halaman ini)','<button class="secondary" data-act="csv" data-id="j">⬇ Jamaah (CSV)</button><button class="secondary" data-act="csv" data-id="t">⬇ Setoran (CSV)</button>')+`<div class="card pad">${tbl(['Paket','Jamaah','Total tagihan','Terkumpul','Sisa'],rows.slice(pg.s,pg.e).join(''))}${pg.html}</div>`};
+return head('Laporan','Rekap per paket & ekspor data (CSV berisi seluruh data, bukan hanya halaman ini)','<button class="secondary" data-act="csv" data-id="j">⬇ Jamaah (CSV)</button><button class="secondary" data-act="csv" data-id="t">⬇ Setoran (CSV)</button>')+`<div class="card pad">${tbl(['No','Paket','Jamaah','Total tagihan','Terkumpul','Sisa'],nr(rows.slice(pg.s,pg.e),pg.s))}${pg.html}</div>`};
 A.pg=s=>{const[k,n]=s.split('|');PG[k]=+n;const T={jamaah:['#jt',()=>jrows()],setoran:['#st',()=>strows()],biro:['#pjb',()=>pjB()],riwayat:['#pjr',()=>pjR()]}[k];
 let t=null;if(T){t=$(T[0]);if(t)t.innerHTML=T[1]()}else render();
 if(!t)t=document.querySelector('.card.pad');if(t)(t.closest('.pad')||t).scrollIntoView({behavior:'smooth',block:'start'})};
@@ -318,9 +322,9 @@ A.ps=v=>{PS=+v||15;try{localStorage.setItem('umroh_ps',PS)}catch(e){}Object.keys
 let RWY=[],RWE='',PQ='',PJTR=null,RWTR=null;PG.biro=1;PG.riwayat=1;
 const PAKET_HARI={bulanan:30,tahunan:365};
 function pjB(){const k=PQ.toLowerCase(),l=PJD.filter(x=>(x.biro+' '+x.admin+' '+(x.email||'')+' '+(x.kode||'')).toLowerCase().includes(k)),pg=pager('biro',l.length);
-return tbl(['Biro','Kontak','Status','Masa aktif','Terakhir bayar','Jamaah','Aksi'],l.slice(pg.s,pg.e).map(x=>PJTR(x)).join(''))+pg.html}
+return tbl(['No','Biro','Kontak','Status','Masa aktif','Terakhir bayar','Jamaah','Aksi'],nr(l.slice(pg.s,pg.e).map(x=>PJTR(x)),pg.s))+pg.html}
 function pjR(){if(RWE)return `<p class="err">Riwayat belum aktif: ${esc(RWE)}. Jalankan <b>langganan_log.sql</b> di Supabase SQL Editor terlebih dahulu.</p>`;
-const pg=pager('riwayat',RWY.length);return tbl(['Tanggal','Biro','Paket','Masa aktif','Metode','Nominal',''],RWY.slice(pg.s,pg.e).map(r=>RWTR(r)).join(''))+pg.html}
+const pg=pager('riwayat',RWY.length);return tbl(['No','Tanggal','Biro','Paket','Masa aktif','Metode','Nominal',''],nr(RWY.slice(pg.s,pg.e).map(r=>RWTR(r)),pg.s))+pg.html}
 pjLoad=async function(){const el=$('#pj');if(!el)return;
 const[a,b]=await Promise.all([SB.rpc('owner_list'),SB.rpc('owner_riwayat')]);
 if(a.error){el.innerHTML='<div class="card pad"><p class="err">'+esc(a.error.message)+'</p></div>';return}
