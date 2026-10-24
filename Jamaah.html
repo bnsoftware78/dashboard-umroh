@@ -1,6 +1,10 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
+<meta name="referrer" content="no-referrer"><meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#0d5b4c"><link rel="icon" type="image/png" href="icon-192.png"><link rel="apple-touch-icon" href="apple-touch-icon.png"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Tabungan Umroh">
+<script>
+(function(){try{var u=new URL('./',location.href),m={name:'Tabungan Umroh',short_name:'Tabungan',start_url:location.href,scope:u.href,display:'standalone',background_color:'#f3f6f4',theme_color:'#0d5b4c',lang:'id',icons:[{src:new URL('icon-192.png',u).href,sizes:'192x192',type:'image/png'},{src:new URL('icon-512.png',u).href,sizes:'512x512',type:'image/png',purpose:'any maskable'}]};var l=document.createElement('link');l.rel='manifest';l.href=URL.createObjectURL(new Blob([JSON.stringify(m)],{type:'application/manifest+json'}));document.head.appendChild(l)}catch(e){}})();
+</script>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Tabungan Umroh Saya</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -84,7 +88,7 @@ async function load(){
   if(r.error||!r.data){$('#app').innerHTML='<div class="center">Tautan tidak valid atau sudah tidak aktif.<br>Silakan hubungi admin biro Anda.</div>';return}
   DATA=r.data;draw()}
 function draw(){
-  const {biro:b,jamaah:j,setoran:S}=DATA,w=b.warna||'#0d5b4c',r=document.documentElement.style;r.setProperty('--green',w);r.setProperty('--deep',dark(w,.62));document.title='Tabungan '+j.n+' — '+b.biro;
+  const {biro:b,jamaah:j,setoran:S}=DATA,w=/^#[0-9a-f]{6}$/i.test(b.warna||'')?b.warna:'#0d5b4c',r=document.documentElement.style;r.setProperty('--green',w);r.setProperty('--deep',dark(w,.62));document.title='Tabungan '+j.n+' — '+b.biro;
   const okS=S.filter(x=>x.st=='ok'&&!x.void),pend=S.filter(x=>x.st!='ok'&&!x.void),paid=okS.reduce((a,x)=>a+x.v,0),pendSum=pend.reduce((a,x)=>a+x.v,0),harga=+j.harga||0,sisa=Math.max(0,harga-paid),pc=harga?Math.min(100,paid/harga*100):0;
   const ms=[];for(let i=5;i>=0;i--){const d=new Date();d.setDate(1);d.setMonth(d.getMonth()-i);const k=iso(d).slice(0,7);ms.push({l:d.toLocaleDateString('id-ID',{month:'short'}),v:okS.filter(x=>x.tgl.startsWith(k)).reduce((a,x)=>a+x.v,0)})}
   const mx=Math.max(1,...ms.map(x=>x.v)),avg=ms.slice(-3).reduce((a,x)=>a+x.v,0)/3;
@@ -162,4 +166,5 @@ return `<section class="due ${hot?'hot':''}"><div><small>Sisa yang perlu dilunas
 
 load();
 </script>
+<script>if('serviceWorker' in navigator&&location.protocol==='https:')addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));</script>
 </body></html>
