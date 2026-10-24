@@ -96,6 +96,11 @@ input:focus,select:focus,textarea:focus{outline:2px solid color-mix(in srgb,var(
 #lg .box{border-top:4px solid var(--gold);max-width:400px}
 @media(max-width:1050px){.hero{padding:28px}.lower{grid-template-columns:1fr}}
 @media(max-width:760px){.sidebar{height:100vh}.nav a.active:before{left:-8px}.content{padding:20px 14px 48px}.hero{grid-template-columns:1fr;padding:24px 20px}.hero h1{font-size:30px}.ring{display:none}.statval{font-size:25px!important}.sidebottom{padding:8px 0;background:none;border:0}}
+
+.status.late{background:#fdecea;color:#b3261e}.status.late:before{background:#c0392b}
+.sisa{font-weight:700;color:#a8631a}.sisa.ok{color:#2f8a67}.pct{display:block;font-size:10px;color:var(--muted);margin-top:3px}
+.mini{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:17px}.mini .stat{min-height:98px;padding:16px 18px}.mini .statval{font-size:25px!important;margin:10px 0 2px}
+@media(max-width:1050px){.mini{grid-template-columns:repeat(2,1fr)}}
 </style>
 </head>
 <body>
@@ -219,7 +224,7 @@ ${s.banner?`<div class="banner" style="background-image:url('${esc(s.banner)}')"
 <section class="dashboard"><article class="card panel"><div class="panelhead"><div><h2>Perkembangan tabungan</h2><p>Dana terkonfirmasi per bulan · 6 bulan terakhir</p></div></div><div class="bars">${m.map(x=>`<div class="bc" title="${rp(x.v)}"><i>${sh(x.v).replace('Rp ','')}</i><div class="bar" style="height:${x.v/mx*75}%"></div>${x.l}</div>`).join('')}</div></article>
 <article class="card panel goal"><div class="gpat"></div><div class="panelhead"><div><h2>Target keberangkatan</h2><p>Tahun ${s.tahun}</p></div></div><div class="goalamount">${rp(T)}</div><div class="goalcaption">dari target ${rp(s.target)}</div><div class="progress"><span style="width:${pc}%"></span></div><div class="progressrow"><span>${pc.toFixed(0)}% tercapai</span><span>${D.j.length} jamaah</span></div><div class="goalfoot"><div><small>Kurang</small><b>${sh(Math.max(0,s.target-T))}</b></div><div><small>Rata-rata/bulan</small><b>${sh(avg)}</b></div></div></article></section>
 <section class="lower"><article class="card transactions"><div class="panelhead"><div><h2>Setoran terbaru</h2><p>Transaksi tabungan jamaah yang baru masuk</p></div><button class="secondary" data-go="setoran">Lihat semua →</button></div>${tbl(['Jamaah','Tanggal','Metode','Nominal','Status'],last.map(x=>trow(x)).join(''))}</article>
-<article class="card panel"><div class="panelhead"><div><h2>Kuota paket</h2><p>Keterisian kursi tiap paket</p></div><button class="secondary" data-go="paket">Kelola</button></div>${pk}</article></section>`};
+<article class="card panel"><div class="panelhead"><div><h2>Kuota paket</h2><p>Keterisian kursi tiap paket</p></div><button class="secondary" data-go="paket">Kelola</button></div>${pk}</article></section>${sisaCard()}`};
 
 
 /* ===== Portal jamaah: tautan & bukti ===== */
@@ -232,6 +237,34 @@ A.bukti=async p=>{const w=window.open('','_blank');const r=await SB.storage.from
 /* ===== Tanggal keberangkatan paket (kalender) ===== */
 const fb=d=>/^\d{4}-\d{2}-\d{2}$/.test(d||'')?fd(d):(d||'-');
 A.tglP=id=>{const v=P(id)?.ber||'';form('Tanggal keberangkatan',[{k:'ber',l:'Pilih tanggal',t:'date',v:/^\d{4}-\d{2}-\d{2}$/.test(v)?v:'',r:1}],x=>{run(SB.from('paket').update({ber:x.ber}).eq('id',id))})};
+
+
+/* ===== Sisa pembayaran per jamaah ===== */
+let SORT='';
+const tglOk=d=>/^\d{4}-\d{2}-\d{2}$/.test(d||'');
+function jinfo(j){const p=P(j.paket),hg=p?(j.harga??p.harga):0,pd=paid(j.id),sisa=Math.max(0,hg-pd),pc=hg?Math.min(100,pd/hg*100):0,today=new Date();today.setHours(0,0,0,0);
+const dep=p&&tglOk(p.ber)?new Date(p.ber+'T00:00'):null,dLeft=dep?Math.round((dep-today)/864e5):null,mLeft=dep?Math.max(0,(dep.getFullYear()-today.getFullYear())*12+dep.getMonth()-today.getMonth()):null,
+need=dep&&sisa>0?(mLeft>0?Math.ceil(sisa/mLeft/1000)*1000:sisa):null;
+let st=['Belum pilih paket','pending'];if(p){if(hg>0&&sisa==0)st=['Lunas',''];else if(dLeft!==null&&dLeft<0)st=['Terlewat','late'];else if(dLeft!==null&&dLeft<=60)st=['Segera lunasi','late'];else st=['Menabung','pending']}
+return{p,hg,pd,sisa,pc,dep,dLeft,mLeft,need,st}}
+const hl=i=>i.dep?(i.dLeft<0?'sudah lewat':'H-'+i.dLeft):'';
+const urg=i=>i.sisa==0&&i.p?1e9:i.dLeft==null?1e8:i.dLeft;
+jrows=function(){const k=q.toLowerCase();let l=D.j.filter(j=>(j.n+j.id).toLowerCase().includes(k)).map(j=>({j,i:jinfo(j)}));
+if(SORT=='sisa')l.sort((a,b)=>b.i.sisa-a.i.sisa);else if(SORT=='mendesak')l.sort((a,b)=>urg(a.i)-urg(b.i));
+return tbl(['Jamaah','Paket / berangkat','Terkumpul','Sisa','Perlu / bulan','Progres','Status',''],l.map(({j,i})=>`<tr><td><div class="person"><span class="miniava">${esc(ini(j.n))}</span><span><b>${esc(j.n)}</b><small>${esc(j.id)}${j.hp?' · '+esc(j.hp):''}</small></span></div></td>
+<td>${esc(i.p?.n||'-')}<small style="display:block;color:#8a9a94;font-size:10px;margin-top:3px">${i.dep?fd(iso(i.dep))+' · '+hl(i):esc(i.p?.ber||'')}</small></td>
+<td class="amount">${rp(i.pd)}</td><td class="sisa ${i.p&&i.sisa==0?'ok':''}">${i.p?(i.sisa>0?rp(i.sisa):'Lunas'):'-'}</td><td>${i.need!=null?rp(i.need):'-'}</td>
+<td><div class="bar2"><span style="width:${i.pc}%"></span></div><span class="pct">${i.pc.toFixed(0)}%</span></td><td><span class="status ${i.st[1]}">${i.st[0]}</span></td>
+<td><button class="linkbtn" data-act="addT" data-id="${j.id}">Setor</button> <button class="linkbtn" data-act="link" data-id="${j.id}">Tautan</button> ${i.sisa>0?`<button class="linkbtn" data-act="ingat" data-id="${j.id}">Ingatkan</button> `:''}<button class="linkbtn danger" data-act="delJ" data-id="${j.id}">Hapus</button></td></tr>`).join(''))};
+V.jamaah=function(){const L=D.j.map(jinfo),sis=L.reduce((a,i)=>a+i.sisa,0),lunas=L.filter(i=>i.p&&i.hg>0&&i.sisa==0).length,mep=L.filter(i=>i.sisa>0&&i.dLeft!==null&&i.dLeft<=60).length,rata=L.length?L.reduce((a,i)=>a+i.pc,0)/L.length:0;
+const c=(a,v,f)=>`<article class="card stat"><div class="stathead">${a}</div><div class="statval">${v}</div><div class="statfoot">${f}</div></article>`;
+return head('Data Jamaah',D.j.length+' jamaah terdaftar','<button class="primary" data-act="addJ">＋ Tambah jamaah</button>')+`<section class="mini">${c('Total sisa tagihan',sh(sis),'belum dibayar seluruh jamaah')}${c('Sudah lunas',lunas,'dari '+D.j.length+' jamaah')}${c('Segera berangkat',mep,'belum lunas, ≤ 60 hari')}${c('Rata-rata progres',rata.toFixed(0)+'%','seluruh jamaah')}</section>
+<div class="card pad"><div class="tools"><input id="q" placeholder="Cari nama / nomor…" value="${esc(q)}" oninput="q=this.value;$('#jt').innerHTML=jrows()"><select style="max-width:210px;margin:0" onchange="SORT=this.value;$('#jt').innerHTML=jrows()"><option value="">Urutan: terdaftar</option><option value="mendesak" ${SORT=='mendesak'?'selected':''}>Paling mendesak</option><option value="sisa" ${SORT=='sisa'?'selected':''}>Sisa terbesar</option></select></div><div id="jt">${jrows()}</div></div>`};
+function sisaCard(){const l=D.j.map(j=>({j,i:jinfo(j)})).filter(x=>x.i.sisa>0).sort((a,b)=>urg(a.i)-urg(b.i)).slice(0,6);
+return `<section class="card transactions" style="margin-top:18px"><div class="panelhead"><div><h2>Sisa pembayaran jamaah</h2><p>Diurutkan dari keberangkatan terdekat</p></div><button class="secondary" data-go="jamaah">Lihat semua →</button></div>${tbl(['Jamaah','Berangkat','Sisa','Perlu / bulan','Status',''],l.map(({j,i})=>`<tr><td><div class="person"><span class="miniava">${esc(ini(j.n))}</span><span><b>${esc(j.n)}</b><small>${esc(i.p?.n||'Belum pilih paket')}</small></span></div></td><td>${i.dep?fd(iso(i.dep))+'<small style="display:block;color:#8a9a94;font-size:10px">'+hl(i)+'</small>':'-'}</td><td class="sisa">${rp(i.sisa)}</td><td>${i.need!=null?rp(i.need):'-'}</td><td><span class="status ${i.st[1]}">${i.st[0]}</span></td><td><button class="linkbtn" data-act="ingat" data-id="${j.id}">Ingatkan</button></td></tr>`).join(''))}</section>`}
+A.ingat=id=>{const j=J(id);if(!j)return;const i=jinfo(j),u=new URL('jamaah.html',location.href);u.searchParams.set('t',j.token);
+const t='Assalamu’alaikum '+j.n+', sisa pembayaran umroh Anda '+rp(i.sisa)+(i.dep?' dan keberangkatan pada '+fd(iso(i.dep)):'')+'.'+(i.need?' Agar lunas tepat waktu, disarankan menabung sekitar '+rp(i.need)+' per bulan.':'')+' Pantau dan kirim bukti transfer di: '+u.href;
+const w=wal(j.hp);if(w)window.open('https://wa.me/'+w+'?text='+encodeURIComponent(t),'_blank');else{navigator.clipboard?.writeText(t);msg('Pesan disalin. Nomor HP jamaah belum diisi.')}};
 
 boot();
 </script>
