@@ -459,10 +459,148 @@ const ps=D.p.filter(p=>{const d=dp(p);return LP=='semua'||(LP=='aktif'?(!d||d>=t
 let tJ=0,tT=0,tR=0;const rows=ps.map(p=>{const js=D.j.filter(j=>j.paket==p.id),tg=js.reduce((a,j)=>a+(j.harga??p.harga),0),tr=js.reduce((a,j)=>a+paid(j.id),0),d=dp(p);tJ+=js.length;tT+=tg;tR+=tr;
 return `<tr><td><b>${esc(p.n)}</b>${d&&d<today?'<small style="display:block;color:#8a9a94">sudah berangkat</small>':''}</td><td>${esc(fb(p.ber))}</td><td>${js.length}</td><td class="amount">${rp(tg)}</td><td class="amount">${rp(tr)}</td><td class="amount">${rp(Math.max(0,tg-tr))}</td></tr>`}),pg=pager('laporan',rows.length);
 const c=(a,v,f)=>`<article class="card stat"><div class="stathead">${a}</div><div class="statval">${v}</div><div class="statfoot">${f}</div></article>`,op=(v,t)=>`<option value="${v}" ${LP==v?'selected':''}>${t}</option>`;
-return head('Laporan','Rekap per periode keberangkatan · CSV selalu berisi seluruh data','<button class="secondary" data-act="csv" data-id="j">⬇ Jamaah (CSV)</button><button class="secondary" data-act="csv" data-id="t">⬇ Setoran (CSV)</button>')+`<section class="mini">${c('Paket',ps.length,'pada periode ini')}${c('Jamaah',tJ,'terdaftar')}${c('Terkumpul',sh(tR),'dari tagihan '+sh(tT))}${c('Sisa tagihan',sh(Math.max(0,tT-tR)),'belum dibayar')}</section>
+return head('Laporan','Rekap per periode keberangkatan · CSV selalu berisi seluruh data','<button class="primary" data-act="xlsx">⬇ Laporan Excel (lengkap + grafik)</button><button class="secondary" data-act="csv" data-id="j">⬇ Jamaah (CSV)</button><button class="secondary" data-act="csv" data-id="t">⬇ Setoran (CSV)</button>')+`<section class="mini">${c('Paket',ps.length,'pada periode ini')}${c('Jamaah',tJ,'terdaftar')}${c('Terkumpul',sh(tR),'dari tagihan '+sh(tT))}${c('Sisa tagihan',sh(Math.max(0,tT-tR)),'belum dibayar')}</section>
 <div class="card pad"><div class="tools"><select style="max-width:260px;margin:0" onchange="LP=this.value;PG.laporan=1;render()">${op('aktif','Periode berjalan (belum berangkat)')}${yrs.map(y=>op(y,'Tahun keberangkatan '+y)).join('')}${op('semua','Semua periode')}</select></div>${tbl(['No','Paket','Berangkat','Jamaah','Total tagihan','Terkumpul','Sisa'],nr(rows.slice(pg.s,pg.e),pg.s))}${pg.html}</div>`};
 A.csv=k=>{const q2=v=>v??'',r=k=='j'?[['ID','Nama','HP','Jenis kelamin','Tanggal lahir','Alamat','Kontak darurat','Paket','Berangkat','Terkumpul','Sisa'],...D.j.map(j=>{const i=jinfo(j);return[j.id,j.n,q2(j.hp),jkTxt(j.jk),q2(j.tgl_lahir),q2(j.alamat),q2(j.darurat),i.p?.n||'',i.p?.ber||'',i.pd,i.sisa]})]:[['Tanggal','ID Jamaah','Nama','Metode','Nominal','Status'],...D.t.map(x=>[x.tgl,x.j,J(x.j)?.n||'',x.m,x.v,x.void?'dibatalkan':x.st])];
 dl(k=='j'?'jamaah.csv':'setoran.csv',r.map(a=>a.map(c=>{let s=String(c);if(/^[=+\-@\t\r]/.test(s))s="'"+s;return `"${s.replace(/"/g,'""')}"`}).join(',')).join('\n'),'text/csv')};
+
+/* ===== Pembuat laporan Excel (ExcelJS + JSZip untuk grafik bawaan Excel) ===== */
+async function buildXlsx(ExcelJS,JSZip,R){
+  const wb=new ExcelJS.Workbook();wb.creator=R.biro;wb.created=new Date();
+  const G=/^#[0-9a-f]{6}$/i.test(R.warna||'')?R.warna.slice(1).toUpperCase():'0D5B4C',GA='FF'+G;
+  const solid=c=>({type:'pattern',pattern:'solid',fgColor:{argb:c}});
+  const thin={style:'thin',color:{argb:'FFD9E2DE'}},border={top:thin,left:thin,bottom:thin,right:thin};
+  const RP='"Rp" #,##0',DT='dd mmm yyyy';
+  const colL=n=>{let s='';n++;while(n>0){const m=(n-1)%26;s=String.fromCharCode(65+m)+s;n=Math.floor((n-1)/26)}return s};
+  const charts=[]; // {sheet, from:[col,row], to:[col,row], xml}
+
+  function title(ws,text,sub,span){ws.mergeCells(1,1,1,span);const c=ws.getCell(1,1);c.value=text;c.font={name:'Calibri',size:18,bold:true,color:{argb:GA}};c.alignment={vertical:'middle'};ws.getRow(1).height=32;
+    if(sub){ws.mergeCells(2,1,2,span);const d=ws.getCell(2,1);d.value=sub;d.font={name:'Calibri',size:10,italic:true,color:{argb:'FF70827D'}}}}
+  function header(ws,row,labels,startCol=1){labels.forEach((l,i)=>{const c=ws.getCell(row,startCol+i);c.value=l;c.font={name:'Calibri',bold:true,color:{argb:'FFFFFFFF'},size:11};c.fill=solid(GA);c.border=border;c.alignment={vertical:'middle',horizontal:'center',wrapText:true}});ws.getRow(row).height=26}
+  function body(ws,row,vals,fmts,startCol=1,zebra){vals.forEach((v,i)=>{const c=ws.getCell(row,startCol+i);c.value=v;c.border=border;c.font={name:'Calibri',size:11};if(fmts&&fmts[i])c.numFmt=fmts[i];if(zebra)c.fill=solid('FFF6FAF8');c.alignment={vertical:'middle',horizontal:(typeof v=='number'||v instanceof Date||(v&&v.formula))?(fmts&&fmts[i]=='0'?'center':'right'):'left'}})}
+  function totalRow(ws,row,vals,fmts,startCol=1){vals.forEach((v,i)=>{const c=ws.getCell(row,startCol+i);c.value=v;c.font={name:'Calibri',bold:true,size:11,color:{argb:GA}};c.fill=solid('FFE8F4EF');c.border=border;if(fmts&&fmts[i])c.numFmt=fmts[i];c.alignment={vertical:'middle',horizontal:i==0?'left':'right'}})}
+  const cf=(ws,ref,map,col)=>ws.addConditionalFormatting({ref,rules:Object.entries(map).map(([t,[bg,fg]])=>({type:'expression',formulae:[`$${col}${ref.match(/\d+/)[0]}="${t}"`],style:{fill:{type:'pattern',pattern:'solid',bgColor:{argb:bg}},font:{color:{argb:fg},bold:true}}}))});
+  const bar=(ws,ref)=>ws.addConditionalFormatting({ref,rules:[{type:'dataBar',gradient:false,minLength:0,maxLength:100,cfvo:[{type:'num',value:0},{type:'num',value:1}],color:{argb:'FFE7BD71'}}]});
+
+  /* ---------- chart xml ---------- */
+  const X=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const strRef=(f,a)=>`<c:strRef><c:f>${X(f)}</c:f><c:strCache><c:ptCount val="${a.length}"/>${a.map((v,i)=>`<c:pt idx="${i}"><c:v>${X(v)}</c:v></c:pt>`).join('')}</c:strCache></c:strRef>`;
+  const numRef=(f,a)=>`<c:numRef><c:f>${X(f)}</c:f><c:numCache><c:formatCode>General</c:formatCode><c:ptCount val="${a.length}"/>${a.map((v,i)=>`<c:pt idx="${i}"><c:v>${+v||0}</c:v></c:pt>`).join('')}</c:numCache></c:numRef>`;
+  const ttl=t=>`<c:title><c:tx><c:rich><a:bodyPr/><a:p><a:pPr><a:defRPr sz="1300" b="1"/></a:pPr><a:r><a:rPr lang="id-ID" sz="1300" b="1"/><a:t>${X(t)}</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title><c:autoTitleDeleted val="0"/>`;
+  const shell=(inner,legend)=>`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><c:roundedCorners val="0"/><c:chart>${inner}${legend?'<c:legend><c:legendPos val="b"/><c:overlay val="0"/></c:legend>':''}<c:plotVisOnly val="1"/><c:dispBlanksAs val="gap"/></c:chart><c:spPr><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill><a:ln w="9525"><a:solidFill><a:srgbClr val="D9E2DE"/></a:solidFill></a:ln></c:spPr></c:chartSpace>`;
+  function barXml(t,sheet,catRng,cats,series){
+    const ser=series.map((s,i)=>`<c:ser><c:idx val="${i}"/><c:order val="${i}"/><c:tx>${strRef(`'${sheet}'!${s.name}`,[s.label])}</c:tx><c:spPr><a:solidFill><a:srgbClr val="${s.color}"/></a:solidFill></c:spPr><c:invertIfNegative val="0"/><c:cat>${strRef(`'${sheet}'!${catRng}`,cats)}</c:cat><c:val>${numRef(`'${sheet}'!${s.rng}`,s.vals)}</c:val></c:ser>`).join('');
+    return shell(`${ttl(t)}<c:plotArea><c:layout/><c:barChart><c:barDir val="col"/><c:grouping val="clustered"/><c:varyColors val="0"/>${ser}<c:gapWidth val="60"/><c:axId val="111"/><c:axId val="222"/></c:barChart><c:catAx><c:axId val="111"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="b"/><c:numFmt formatCode="General" sourceLinked="0"/><c:majorTickMark val="none"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:crossAx val="222"/><c:crosses val="autoZero"/><c:auto val="1"/><c:lblAlgn val="ctr"/><c:lblOffset val="100"/><c:noMultiLvlLbl val="0"/></c:catAx><c:valAx><c:axId val="222"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="l"/><c:majorGridlines><c:spPr><a:ln w="6350"><a:solidFill><a:srgbClr val="E3EBE7"/></a:solidFill></a:ln></c:spPr></c:majorGridlines><c:numFmt formatCode="#,##0" sourceLinked="0"/><c:majorTickMark val="none"/><c:minorTickMark val="none"/><c:tickLblPos val="nextTo"/><c:crossAx val="111"/><c:crosses val="autoZero"/><c:crossBetween val="between"/></c:valAx></c:plotArea>`,series.length>1)}
+  function pieXml(t,sheet,catRng,cats,valRng,vals,colors){
+    const dpt=colors.map((c,i)=>`<c:dPt><c:idx val="${i}"/><c:bubble3D val="0"/><c:spPr><a:solidFill><a:srgbClr val="${c}"/></a:solidFill><a:ln w="12700"><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill></a:ln></c:spPr></c:dPt>`).join('');
+    return shell(`${ttl(t)}<c:plotArea><c:layout/><c:pieChart><c:varyColors val="1"/><c:ser><c:idx val="0"/><c:order val="0"/><c:tx>${strRef(`'${sheet}'!$B$13`,['Jamaah'])}</c:tx>${dpt}<c:dLbls><c:spPr><a:noFill/><a:ln><a:noFill/></a:ln></c:spPr><c:showLegendKey val="0"/><c:showVal val="1"/><c:showCatName val="0"/><c:showSerName val="0"/><c:showPercent val="0"/><c:showBubbleSize val="0"/><c:showLeaderLines val="0"/></c:dLbls><c:cat>${strRef(`'${sheet}'!${catRng}`,cats)}</c:cat><c:val>${numRef(`'${sheet}'!${valRng}`,vals)}</c:val></c:ser><c:firstSliceAng val="0"/></c:pieChart></c:plotArea>`,true)}
+
+  /* ---------- Sheet 1: Ringkasan ---------- */
+  const s1=wb.addWorksheet('Ringkasan',{views:[{showGridLines:false}]});
+  s1.getColumn(1).width=32;s1.getColumn(2).width=24;s1.getColumn(3).width=3;for(let i=4;i<=11;i++)s1.getColumn(i).width=12;
+  title(s1,'Laporan Tabungan Umroh — '+R.biro,'Dicetak '+R.tgl,11);
+  header(s1,4,['Indikator','Nilai']);
+  R.kpi.forEach((k,i)=>body(s1,5+i,[k[0],k[1]],[null,k[2]||null],1,i%2==1));
+  const stH=5+R.kpi.length+1; // header status
+  const stRows=R.status.filter(x=>x.v>0);
+  const stHeaderRow=13; // fixed so pie series name ref stays valid
+  if(stH>stHeaderRow){/* kpi list is fixed at 7 rows */}
+  header(s1,stHeaderRow,['Status jamaah','Jamaah']);
+  const stList=stRows.length?stRows:[{l:'(belum ada jamaah)',v:0,c:'CCCCCC'}];
+  stList.forEach((x,i)=>body(s1,stHeaderRow+1+i,[x.l,x.v],[null,'0'],1,i%2==1));
+  const bH=stHeaderRow+1+stList.length+1;
+  header(s1,bH,['Bulan','Dana terkonfirmasi']);
+  R.bulan.forEach((x,i)=>body(s1,bH+1+i,[x.l,x.v],[null,RP],1,i%2==1));
+  const bEnd=bH+R.bulan.length;
+  if(stRows.length)charts.push({sheet:0,from:[3,2],to:[9,bH-2>17?17:bH-2],xml:pieXml('Komposisi status jamaah','Ringkasan',`$A$${stHeaderRow+1}:$A$${stHeaderRow+stRows.length}`,stRows.map(x=>x.l),`$B$${stHeaderRow+1}:$B$${stHeaderRow+stRows.length}`,stRows.map(x=>x.v),stRows.map(x=>x.c))});
+  if(R.bulan.some(x=>x.v>0))charts.push({sheet:0,from:[3,bH-1],to:[11,bH+15],xml:barXml('Dana terkonfirmasi per bulan (12 bulan terakhir)','Ringkasan',`$A$${bH+1}:$A$${bEnd}`,R.bulan.map(x=>x.l),[{name:`$B$${bH}`,label:'Dana terkonfirmasi',rng:`$B$${bH+1}:$B$${bEnd}`,vals:R.bulan.map(x=>x.v),color:G}])});
+
+  /* ---------- Sheet 2: Per Paket ---------- */
+  const s2=wb.addWorksheet('Per Paket',{views:[{showGridLines:false,state:'frozen',ySplit:3}]});
+  [28,16,9,9,20,20,20,12].forEach((w,i)=>s2.getColumn(i+1).width=w);
+  title(s2,'Rekap per Paket / Periode Keberangkatan','Tagihan = harga paket × jamaah (harga terkunci diperhitungkan)',8);
+  header(s2,3,['Paket','Berangkat','Kuota','Terisi','Total tagihan','Terkumpul','Sisa tagihan','Progres']);
+  const n2=R.paket.length;
+  R.paket.forEach((p,i)=>{const r=4+i;body(s2,r,[p.n,p.ber,p.kuota,p.jml,p.tagih,p.kumpul,{formula:`MAX(0,E${r}-F${r})`,result:Math.max(0,p.tagih-p.kumpul)},{formula:`IF(E${r}=0,0,MIN(1,F${r}/E${r}))`,result:p.tagih?Math.min(1,p.kumpul/p.tagih):0}],[null,DT,'0','0',RP,RP,RP,'0%'],1,i%2==1)});
+  if(n2){const t=4+n2,sum=c=>({formula:`SUM(${c}4:${c}${t-1})`,result:0});
+    totalRow(s2,t,['TOTAL','',{formula:`SUM(C4:C${t-1})`,result:R.paket.reduce((a,p)=>a+p.kuota,0)},{formula:`SUM(D4:D${t-1})`,result:R.paket.reduce((a,p)=>a+p.jml,0)},{formula:`SUM(E4:E${t-1})`,result:R.paket.reduce((a,p)=>a+p.tagih,0)},{formula:`SUM(F4:F${t-1})`,result:R.paket.reduce((a,p)=>a+p.kumpul,0)},{formula:`SUM(G4:G${t-1})`,result:R.paket.reduce((a,p)=>a+Math.max(0,p.tagih-p.kumpul),0)},{formula:`IF(E${t}=0,0,F${t}/E${t})`,result:(()=>{const T=R.paket.reduce((x,p)=>x+p.tagih,0),K=R.paket.reduce((x,p)=>x+p.kumpul,0);return T?K/T:0})()}],[null,null,'0','0',RP,RP,RP,'0%']);
+    bar(s2,`H4:H${t-1}`);
+    charts.push({sheet:1,from:[0,t+1],to:[8,t+19],xml:barXml('Tagihan vs dana terkumpul per paket','Per Paket',`$A$4:$A$${t-1}`,R.paket.map(p=>p.n),[{name:'$E$3',label:'Total tagihan',rng:`$E$4:$E$${t-1}`,vals:R.paket.map(p=>p.tagih),color:'D9A84E'},{name:'$F$3',label:'Terkumpul',rng:`$F$4:$F$${t-1}`,vals:R.paket.map(p=>p.kumpul),color:G}])})}
+  else{s2.getCell(5,1).value='Belum ada paket.';s2.getCell(5,1).font={italic:true,color:{argb:'FF70827D'}}}
+
+  /* ---------- Sheet 3: Jamaah ---------- */
+  const s3=wb.addWorksheet('Jamaah',{views:[{state:'frozen',ySplit:1,xSplit:3}]});
+  [['No',6],['No. Jamaah',17],['Nama',28],['No. HP',16],['L/P',6],['Tgl lahir',14],['Paket',24],['Berangkat',14],['Harga paket',18],['Terkumpul',18],['Sisa',18],['Progres',11],['Status',20]].forEach((c,i)=>s3.getColumn(i+1).width=c[1]);
+  header(s3,1,['No','No. Jamaah','Nama','No. HP','L/P','Tgl lahir','Paket','Berangkat','Harga paket','Terkumpul','Sisa','Progres','Status']);
+  R.jamaah.forEach((j,i)=>{const r=2+i;body(s3,r,[i+1,j.id,j.n,j.hp,j.jk,j.lahir,j.paket,j.ber,j.harga,j.pd,{formula:`MAX(0,I${r}-J${r})`,result:j.sisa},{formula:`IF(I${r}=0,0,MIN(1,J${r}/I${r}))`,result:j.pc},j.st],['0',null,null,'@',null,DT,null,DT,RP,RP,RP,'0%',null],1,i%2==1);s3.getCell(r,1).alignment={horizontal:'center'};s3.getCell(r,5).alignment={horizontal:'center'};s3.getCell(r,13).alignment={horizontal:'center'}});
+  if(R.jamaah.length){const e=R.jamaah.length+1;s3.autoFilter={from:'A1',to:'M'+e};bar(s3,`L2:L${e}`);cf(s3,`M2:M${e}`,{'Lunas':['FFD8F0E1','FF1B7A4A'],'Menabung':['FFFFF5E4','FFA87521'],'Segera lunasi':['FFFDECEA','FFB3261E'],'Terlewat':['FFFDECEA','FFB3261E'],'Sudah berangkat':['FFE8EEF0','FF50626B'],'Belum pilih paket':['FFEEEEEE','FF666666']},'M');
+    totalRow(s3,e+1,['','','TOTAL','','','','','',{formula:`SUM(I2:I${e})`,result:R.jamaah.reduce((a,j)=>a+j.harga,0)},{formula:`SUM(J2:J${e})`,result:R.jamaah.reduce((a,j)=>a+j.pd,0)},{formula:`SUM(K2:K${e})`,result:R.jamaah.reduce((a,j)=>a+j.sisa,0)},'',''],[null,null,null,null,null,null,null,null,RP,RP,RP,null,null])}
+
+  /* ---------- Sheet 4: Setoran ---------- */
+  const s4=wb.addWorksheet('Setoran',{views:[{state:'frozen',ySplit:1}]});
+  [['No',6],['Tanggal',14],['Jamaah',28],['No. Jamaah',17],['Metode',18],['Nominal',18],['Status',18]].forEach((c,i)=>s4.getColumn(i+1).width=c[1]);
+  header(s4,1,['No','Tanggal','Jamaah','No. Jamaah','Metode','Nominal','Status']);
+  R.setoran.forEach((x,i)=>{body(s4,2+i,[i+1,x.tgl,x.n,x.id,x.m,x.v,x.st],['0',DT,null,null,null,RP,null],1,i%2==1);s4.getCell(2+i,1).alignment={horizontal:'center'};s4.getCell(2+i,7).alignment={horizontal:'center'}});
+  if(R.setoran.length){const e=R.setoran.length+1;s4.autoFilter={from:'A1',to:'G'+e};cf(s4,`G2:G${e}`,{'Terkonfirmasi':['FFD8F0E1','FF1B7A4A'],'Menunggu':['FFFFF5E4','FFA87521'],'Dibatalkan':['FFEEEEEE','FF888888']},'G');
+    totalRow(s4,e+2,['','','','','Total terkonfirmasi',{formula:`SUMIF(G2:G${e},"Terkonfirmasi",F2:F${e})`,result:R.setoran.filter(x=>x.st=='Terkonfirmasi').reduce((a,x)=>a+x.v,0)},''],[null,null,null,null,null,RP,null])}
+
+  /* ---------- Sheet 5: Tunggakan ---------- */
+  const s5=wb.addWorksheet('Sisa Pembayaran',{views:[{state:'frozen',ySplit:1}]});
+  [['No',6],['Nama',28],['No. HP',16],['Paket',24],['Berangkat',14],['Sisa hari',10],['Sisa tagihan',18],['Perlu / bulan',18],['Status',20]].forEach((c,i)=>s5.getColumn(i+1).width=c[1]);
+  header(s5,1,['No','Nama','No. HP','Paket','Berangkat','Sisa hari','Sisa tagihan','Perlu / bulan','Status']);
+  R.tunggak.forEach((x,i)=>{body(s5,2+i,[i+1,x.n,x.hp,x.paket,x.ber,x.dl,x.sisa,x.need,x.st],['0',null,'@',null,DT,'0',RP,RP,null],1,i%2==1);s5.getCell(2+i,1).alignment={horizontal:'center'};s5.getCell(2+i,6).alignment={horizontal:'center'};s5.getCell(2+i,9).alignment={horizontal:'center'}});
+  if(R.tunggak.length){const e=R.tunggak.length+1;s5.autoFilter={from:'A1',to:'I'+e};cf(s5,`I2:I${e}`,{'Menabung':['FFFFF5E4','FFA87521'],'Segera lunasi':['FFFDECEA','FFB3261E'],'Terlewat':['FFFDECEA','FFB3261E'],'Belum pilih paket':['FFEEEEEE','FF666666']},'I');
+    totalRow(s5,e+1,['','','','','','TOTAL',{formula:`SUM(G2:G${e})`,result:R.tunggak.reduce((a,x)=>a+x.sisa,0)},'',''],[null,null,null,null,null,null,RP,null,null])}
+
+  /* ---------- pengaturan cetak ---------- */
+  const ps={orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0,paperSize:9};
+  s1.pageSetup={...ps,printArea:'A1:K'+(bH+16)};s2.pageSetup={...ps,printArea:'A1:H'+(5+n2+20)};[s3,s4,s5].forEach(w=>w.pageSetup=ps);
+  /* ---------- tulis & sisipkan grafik ---------- */
+  const buf=await wb.xlsx.writeBuffer();
+  if(!charts.length)return buf;
+  const zip=await JSZip.loadAsync(buf);
+  const NS_R='http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+  let ct=await zip.file('[Content_Types].xml').async('string');
+  const add=[];let cn=0;const bySheet={};
+  charts.forEach(c=>{(bySheet[c.sheet]=bySheet[c.sheet]||[]).push(c)});
+  for(const si of Object.keys(bySheet)){
+    const sn=+si+1,list=bySheet[si];let anchors='',drels='';
+    list.forEach((c,k)=>{cn++;zip.file(`xl/charts/chart${cn}.xml`,c.xml);add.push(`<Override PartName="/xl/charts/chart${cn}.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/>`);
+      drels+=`<Relationship Id="rId${k+1}" Type="${NS_R}/chart" Target="../charts/chart${cn}.xml"/>`;
+      anchors+=`<xdr:twoCellAnchor><xdr:from><xdr:col>${c.from[0]}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${c.from[1]}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:to><xdr:col>${c.to[0]}</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>${c.to[1]}</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to><xdr:graphicFrame macro=""><xdr:nvGraphicFramePr><xdr:cNvPr id="${k+2}" name="Grafik ${cn}"/><xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr><xdr:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></xdr:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="${NS_R}" r:id="rId${k+1}"/></a:graphicData></a:graphic></xdr:graphicFrame><xdr:clientData/></xdr:twoCellAnchor>`});
+    zip.file(`xl/drawings/drawing${sn}.xml`,`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">${anchors}</xdr:wsDr>`);
+    zip.file(`xl/drawings/_rels/drawing${sn}.xml.rels`,`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${drels}</Relationships>`);
+    add.push(`<Override PartName="/xl/drawings/drawing${sn}.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>`);
+    const rp=`xl/worksheets/_rels/sheet${sn}.xml.rels`;let rel=zip.file(rp)?await zip.file(rp).async('string'):'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>';
+    rel=rel.replace('</Relationships>',`<Relationship Id="rIdDrw1" Type="${NS_R}/drawing" Target="../drawings/drawing${sn}.xml"/></Relationships>`);zip.file(rp,rel);
+    const sp=`xl/worksheets/sheet${sn}.xml`;let sx=await zip.file(sp).async('string');
+    const tag='<drawing r:id="rIdDrw1"/>',ends=[];
+    ['</sheetData>','</mergeCells>','<autoFilter[^>]*/>','</conditionalFormatting>','<printOptions[^>]*/>','<pageMargins[^>]*/>','<pageSetup[^>]*/>','</headerFooter>','</dataValidations>','<hyperlinks>[\\s\\S]*?</hyperlinks>','<rowBreaks[\\s\\S]*?</rowBreaks>'].forEach(re=>{const g=new RegExp(re,'g');let m;while((m=g.exec(sx)))ends.push(m.index+m[0].length)});
+    const pos=Math.max(...ends);sx=sx.slice(0,pos)+tag+sx.slice(pos);
+    if(!/xmlns:r=/.test(sx.slice(0,600)))sx=sx.replace('<worksheet ',`<worksheet xmlns:r="${NS_R}" `);
+    zip.file(sp,sx);
+  }
+  ct=ct.replace('</Types>',add.join('')+'</Types>');zip.file('[Content_Types].xml',ct);
+  return await zip.generateAsync({type:'uint8array',compression:'DEFLATE'});
+}
+
+/* ===== Ekspor laporan Excel (lengkap dengan grafik) ===== */
+const loadJs=u=>new Promise((res,rej)=>{const s=document.createElement('script');s.src=u;s.onload=res;s.onerror=()=>rej(new Error('Gagal memuat pustaka Excel. Periksa koneksi internet.'));document.head.appendChild(s)});
+A.xlsx=async()=>{try{msg('Menyiapkan laporan Excel…');
+if(!window.ExcelJS)await loadJs('https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js');if(!window.JSZip)await loadJs('https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js');
+const td=d=>tglOk(d)?new Date(d+'T00:00:00Z'):null,Li=D.j.map(j=>({j,i:jinfo(j)})),stl=i=>isDone(i)?'Sudah berangkat':i.st[0];
+const COL={'Lunas':'1B7A4A','Menabung':'D9A84E','Segera lunasi':'E07B39','Terlewat':'C0392B','Sudah berangkat':'6B8A99','Belum pilih paket':'9AA5A0'};
+const cnt={};Li.forEach(x=>{const k=stl(x.i);cnt[k]=(cnt[k]||0)+1});
+const now=new Date(),bulan=[];for(let k=11;k>=0;k--){const d=new Date(now.getFullYear(),now.getMonth()-k,1),key=iso(d).slice(0,7);bulan.push({l:d.toLocaleDateString('id-ID',{month:'short',year:'numeric'}),v:ok().filter(x=>x.tgl.startsWith(key)).reduce((a,x)=>a+x.v,0)})}
+const R={biro:D.s.biro,warna:D.s.warna,tgl:now.toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'}),
+kpi:[['Total jamaah',D.j.length,'0'],['Jamaah aktif (belum berangkat)',Li.filter(x=>!isDone(x.i)).length,'0'],['Sudah lunas',Li.filter(x=>isLunas(x.i)).length,'0'],['Total tagihan',Li.reduce((a,x)=>a+x.i.hg,0),'"Rp" #,##0'],['Dana terkumpul',tot(),'"Rp" #,##0'],['Sisa tagihan',Li.reduce((a,x)=>a+x.i.sisa,0),'"Rp" #,##0'],['Setoran menunggu konfirmasi',D.t.filter(x=>x.st!='ok'&&!x.void).length,'0']],
+status:Object.keys(COL).map(k=>({l:k,v:cnt[k]||0,c:COL[k]})),bulan,
+paket:[...D.p].sort((a,b)=>String(a.ber).localeCompare(String(b.ber))).map(p=>{const js=D.j.filter(j=>j.paket==p.id);return{n:p.n,ber:td(p.ber),kuota:+p.kuota||0,jml:js.length,tagih:js.reduce((a,j)=>a+(+(j.harga??p.harga)||0),0),kumpul:js.reduce((a,j)=>a+paid(j.id),0)}}),
+jamaah:Li.map(({j,i})=>({id:j.id,n:j.n,hp:j.hp||'',jk:j.jk||'',lahir:td(j.tgl_lahir),paket:i.p?.n||'',ber:i.p?td(i.p.ber):null,harga:i.hg,pd:i.pd,sisa:i.sisa,pc:i.pc/100,st:stl(i)})),
+setoran:[...D.t].sort((a,b)=>b.tgl.localeCompare(a.tgl)).map(x=>({tgl:td(x.tgl)||new Date(),n:J(x.j)?.n||'(diarsipkan)',id:x.j,m:x.m,v:x.v,st:x.void?'Dibatalkan':x.st=='ok'?'Terkonfirmasi':'Menunggu'})),
+tunggak:Li.filter(x=>!isDone(x.i)&&x.i.sisa>0).sort((a,b)=>urg(a.i)-urg(b.i)).map(({j,i})=>({n:j.n,hp:j.hp||'',paket:i.p?.n||'',ber:i.p?td(i.p.ber):null,dl:i.dLeft,sisa:i.sisa,need:i.need,st:stl(i)}))};
+const out=await buildXlsx(window.ExcelJS,window.JSZip,R),a=document.createElement('a');a.href=URL.createObjectURL(new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));a.download='laporan-umroh-'+iso(now)+'.xlsx';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),4000);msg('Laporan Excel diunduh');
+}catch(x){msg('Gagal membuat Excel: '+(x.message||x))}};
 
 boot();
 </script>
