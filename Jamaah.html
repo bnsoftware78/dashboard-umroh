@@ -80,6 +80,7 @@ function shrink(file,maxW){return new Promise((res,rej)=>{const img=new Image(),
 async function load(){
   if(!TK){$('#app').innerHTML='<div class="center">Tautan tidak lengkap. Mintalah tautan pribadi Anda kepada admin biro.</div>';return}
   const r=await SB.rpc('jamaah_lihat',{p_token:TK});
+  if(r.error&&/fetch|network|failed/i.test(r.error.message||'')){$('#app').innerHTML='<div class="center">Koneksi bermasalah. Periksa internet Anda lalu muat ulang halaman.</div>';return}
   if(r.error||!r.data){$('#app').innerHTML='<div class="center">Tautan tidak valid atau sudah tidak aktif.<br>Silakan hubungi admin biro Anda.</div>';return}
   DATA=r.data;draw()}
 function draw(){
