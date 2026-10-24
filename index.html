@@ -284,6 +284,35 @@ el.innerHTML=`<section class="stats">${st('Menunggu verifikasi',c('menunggu'),'p
 A.tagih=id=>{const x=PJD.find(r=>r.id==id);if(!x)return;const w=wal(x.wa),t='Assalamu’alaikum '+x.admin+', masa aktif aplikasi untuk '+x.biro+(x.dl<0?' sudah berakhir pada ':' akan berakhir pada ')+fd(x.a)+'. Jika ingin melanjutkan, silakan balas pesan ini untuk proses perpanjangan. Terima kasih.';
 if(w)window.open('https://wa.me/'+w+'?text='+encodeURIComponent(t),'_blank');else{navigator.clipboard?.writeText(t);msg('Pesan disalin. Nomor WhatsApp biro kosong.')}};
 
+/* ===== Panel Penjual: riwayat pembayaran langganan & rekap pendapatan ===== */
+let RWY=[];
+const PAKET_HARI={bulanan:30,tahunan:365};
+pjLoad=async function(){const el=$('#pj');if(!el)return;
+const[a,b]=await Promise.all([SB.rpc('owner_list'),SB.rpc('owner_riwayat')]);
+if(a.error){el.innerHTML='<div class="card pad"><p class="err">'+esc(a.error.message)+'</p></div>';return}
+const data=a.data,rwErr=b.error?b.error.message:'';RWY=b.error?[]:(b.data||[]);
+const today=new Date();today.setHours(0,0,0,0);
+const valid=RWY.filter(r=>!r.batal),last={};valid.forEach(r=>{if(!last[r.biro_id]||r.tgl_bayar>last[r.biro_id])last[r.biro_id]=r.tgl_bayar});
+const rows0=data.map(x=>{const s=String(x.aktif_sampai||'').slice(0,10),dl=x.status!='menunggu'&&/^\d{4}-\d{2}-\d{2}$/.test(s)?Math.round((new Date(s+'T00:00')-today)/864e5):null;return{...x,a:s,dl,tb:last[x.id]||''}});PJD=rows0;
+const rk=x=>x.status=='menunggu'?0:x.status=='aktif'?1:2;
+rows0.sort((x,y)=>rk(x)-rk(y)||(x.status=='berakhir'?(y.dl??0)-(x.dl??0):(x.dl??1e9)-(y.dl??1e9)));
+const c=k=>rows0.filter(x=>x.status==k).length,soon=rows0.filter(x=>x.status=='aktif'&&x.dl!==null&&x.dl<=7).length,totJ=rows0.reduce((a,x)=>a+(+x.jamaah||0),0);
+const ym=iso(new Date()).slice(0,7),yy=ym.slice(0,4),sum=f=>valid.filter(f).reduce((a,r)=>a+(+r.nominal||0),0),bln=sum(r=>String(r.tgl_bayar).startsWith(ym)),thn=sum(r=>String(r.tgl_bayar).startsWith(yy));
+const st=(t,v,f)=>`<article class="card stat"><div class="stathead">${t}</div><div class="statval">${v}</div><div class="statfoot">${f}</div></article>`;
+const rows=rows0.map(x=>{const hot=x.dl!==null&&x.dl<=7;return `<tr><td><b>${esc(x.biro)}</b><small style="display:block;color:#8a9a94">${esc(x.admin)} · ${esc(x.kode)}</small></td><td>${esc(x.email||'-')}<small style="display:block"><a href="https://wa.me/${wal(x.wa)}" target="_blank" rel="noopener">${esc(x.wa||'-')}</a></small></td><td><span class="status ${x.status=='aktif'?'':x.status=='berakhir'?'late':'pending'}">${esc(x.status)}</span></td>
+<td>${x.dl===null?'-':fd(x.a)+`<small style="display:block;margin-top:3px"><span class="status ${hot?'late':''}">${x.dl<0?'berakhir '+(-x.dl)+' hari lalu':x.dl==0?'berakhir hari ini':x.dl+' hari lagi'}</span></small>`}</td><td>${x.tb?fd(x.tb):'<span class="note">belum pernah</span>'}</td><td>${x.jamaah}</td>
+<td><button class="linkbtn" data-act="bayar" data-id="${x.id}">＋ Catat bayar</button> <button class="linkbtn" data-act="pj" data-id="${x.id}|tambah|7">+7 hari</button> ${x.status!='menunggu'&&x.dl!==null&&x.dl<=7?`<button class="linkbtn" data-act="tagih" data-id="${x.id}">Ingatkan</button> `:''}<button class="linkbtn danger" data-act="pj" data-id="${x.id}|nonaktif|0">Nonaktifkan</button></td></tr>`}).join('');
+const rw=RWY.map(r=>`<tr${r.batal?' style="opacity:.5;text-decoration:line-through"':''}><td>${fd(String(r.tgl_bayar).slice(0,10))}</td><td><b>${esc(r.biro)}</b>${r.catatan?`<small style="display:block;color:#8a9a94">${esc(r.catatan)}</small>`:''}</td><td>${esc(r.paket)}</td><td>${r.hari} hari</td><td>${esc(r.metode||'-')}</td><td class="amount">${rp(+r.nominal)}</td><td>${r.batal?'<span class="status late">Dibatalkan</span>':`<button class="linkbtn danger" data-act="batalBayar" data-id="${r.id}">Batalkan</button>`}</td></tr>`).join('');
+el.innerHTML=`<section class="stats">${st('Menunggu verifikasi',c('menunggu'),'perlu diaktifkan')}${st('Aktif',c('aktif'),c('berakhir')+' sudah berakhir')}${st('Segera berakhir',soon,'≤ 7 hari lagi')}${st('Pendapatan bulan ini',sh(bln),'tahun '+yy+': '+sh(thn))}</section>
+<div class="card pad"><div class="panelhead"><div><h2>Daftar biro</h2><p>${rows0.length} biro · ${totJ} jamaah terdaftar · urut dari yang paling perlu ditindak</p></div></div>${tbl(['Biro','Kontak','Status','Masa aktif','Terakhir bayar','Jamaah','Aksi'],rows)}</div>
+<div class="card pad"><div class="panelhead"><div><h2>Riwayat pembayaran</h2><p>Catat setelah uang benar-benar masuk ke rekening Anda · 500 catatan terakhir</p></div></div>${rwErr?`<p class="err">Riwayat belum aktif: ${esc(rwErr)}. Jalankan <b>langganan_log.sql</b> di Supabase SQL Editor terlebih dahulu.</p>`:tbl(['Tanggal','Biro','Paket','Masa aktif','Metode','Nominal',''],rw)}</div>`};
+A.bayar=id=>{const x=PJD.find(r=>r.id==id);if(!x)return;
+form('Catat pembayaran · '+x.biro,[{k:'paket',l:'Paket',o:[['tahunan','Tahunan (365 hari)'],['bulanan','Bulanan (30 hari)'],['tambahan','Lainnya (isi jumlah hari)']]},{k:'hari',l:'Jumlah hari (dipakai jika paket "Lainnya")',t:'number',v:365},{k:'v',l:'Nominal diterima (Rp)',t:'number'},{k:'tgl',l:'Tanggal uang masuk',t:'date',v:iso(new Date()),r:1},{k:'m',l:'Metode',o:[['Transfer bank','Transfer bank'],['QRIS','QRIS'],['Tunai','Tunai'],['Lainnya','Lainnya']]},{k:'cat',l:'Catatan (opsional, mis. 5 digit akhir rekening pengirim)'}],
+v=>{(async()=>{const hari=PAKET_HARI[v.paket]||Math.round(+v.hari);if(!(hari>0))return msg('Jumlah hari tidak valid');
+const r=await SB.rpc('owner_catat_bayar',{p_biro:id,p_nominal:+v.v,p_paket:v.paket,p_hari:hari,p_tgl:v.tgl,p_metode:v.m,p_catatan:v.cat||null});
+if(r.error)return msg(r.error.message);msg((r.data||'Pembayaran dicatat')+' · +'+hari+' hari');pjLoad()})()})};
+A.batalBayar=async id=>{if(!confirm('Batalkan catatan pembayaran ini? Masa aktif biro TIDAK otomatis berkurang.'))return;const r=await SB.rpc('owner_batal_bayar',{p_id:+id});if(r.error)return msg(r.error.message);msg(r.data);pjLoad()};
+
 boot();
 </script>
 </body></html>
