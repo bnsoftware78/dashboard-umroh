@@ -43,6 +43,15 @@ input:focus,select:focus{outline:2px solid #0d5b4c55;border-color:var(--green)}
 .empty{text-align:center;color:var(--muted);padding:22px 10px}.err{background:#fdecea;color:#b3261e;border-radius:10px;padding:11px 13px;font-size:12.5px;margin-top:12px}.ok{background:#eaf5ed;color:#2c7a55;border-radius:10px;padding:11px 13px;font-size:12.5px;margin-top:12px}
 .center{min-height:80vh;display:grid;place-items:center;text-align:center;padding:20px;color:var(--muted)}
 @media(max-width:520px){.hero{grid-template-columns:1fr}.ring{margin:auto;order:-1}.hero h1{font-size:26px}.k b{font-size:17px}.st{width:46px;font-size:9px}}
+
+.tabs{display:flex;gap:7px;overflow-x:auto;padding-bottom:4px;margin-bottom:14px}.tab{border:1px solid var(--line);background:#fff;border-radius:99px;padding:9px 14px;font-size:12px;font-weight:600;color:#46645a;white-space:nowrap}.tab.on{background:var(--green);border-color:var(--green);color:#fff}
+input[type=range]{padding:0;border:0;margin:12px 0 4px;accent-color:var(--green);background:none}
+.ctl{background:#f6faf8;border-radius:14px;padding:14px 15px;margin-bottom:14px}.ctl .lb{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;color:var(--muted)}.ctl .lb b{font:700 24px var(--serif);color:var(--ink)}
+.sum{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}.sum div{background:var(--mint);border-radius:13px;padding:11px 10px}.sum small{display:block;font-size:10px;color:var(--muted)}.sum b{display:block;font:700 18px var(--serif);margin-top:4px}
+.warn{background:#fff5e4;color:#8a5d10;border-radius:12px;padding:11px 13px;font-size:12px;line-height:1.5;margin-bottom:12px}.good{background:#eaf5ed;color:#2c7a55;border-radius:12px;padding:11px 13px;font-size:12px;line-height:1.5;margin-bottom:12px}
+.cv{width:100%;height:auto;display:block}.lg{display:flex;gap:14px;flex-wrap:wrap;font-size:10.5px;color:var(--muted);margin:6px 0 14px}.lg i{display:inline-block;width:14px;height:0;border-top:3px solid;vertical-align:middle;margin-right:5px}
+.saldo{background:linear-gradient(135deg,var(--green),var(--deep));color:#fff;border-radius:16px;padding:16px 18px;margin-bottom:14px;position:relative;overflow:hidden}.saldo:before{content:"";position:absolute;inset:0;background-image:var(--pat);background-size:70px;opacity:.9}.saldo>*{position:relative}.saldo small{font-size:11px;color:#bcd6cc}.saldo b{display:block;font:700 30px var(--serif);margin-top:2px}
+.bk{width:100%;border-collapse:collapse;font-size:12px}.bk th{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#81928b;text-align:left;padding:8px 6px;border-bottom:1px solid var(--line)}.bk td{padding:10px 6px;border-bottom:1px dashed #e1e9e5}.bk td.n{text-align:right;font-weight:700;color:#245846}.bk th:nth-child(n+3){text-align:right}.bk small{display:block;color:var(--muted);font-size:10px}.tablewrap{overflow:auto}
 </style>
 </head>
 <body>
@@ -82,18 +91,64 @@ function draw(){
 <section class="grid3"><div class="k"><small>Sudah ditabung</small><b>${sh(paid)}</b></div><div class="k"><small>Sisa pelunasan</small><b>${sh(sisa)}</b></div><div class="k"><small>Perkiraan lunas</small><b style="font-size:17px">${est}</b></div></section>
 ${pend.length?`<div class="ok" style="background:#fff7e6;color:#7d5a14;margin-top:14px">◷ ${pend.length} setoran (${rp(pendSum)}) sedang menunggu konfirmasi admin.</div>`:''}
 <section class="card"><h2>Perjalanan menuju Tanah Suci</h2><p class="sub">Dari total biaya paket ${rp(harga)}</p><div class="track"><div class="fill" style="width:calc((100% - 44px)*${pc/100})"></div>${stp}</div></section>
+${sisa>0?`<section class="card" id="plan"><h2>Rencana pembayaran</h2><p class="sub">Pilih cara bayar yang paling nyaman. Ini hanya simulasi, Anda bebas membayar kapan saja.</p><div class="tabs">${[['lunas','Lunas sekarang'],['dua','2 kali'],['bulan','Cicilan bulanan'],['mampu','Sesuai kemampuan']].map(x=>`<button type="button" class="tab ${PLAN.mode==x[0]?'on':''}" data-m="${x[0]}">${x[1]}</button>`).join('')}</div><div id="pc"></div><div id="pr"></div></section>`:`<section class="card"><h2>Alhamdulillah, tabungan lunas 🎉</h2><p class="sub">Seluruh biaya paket sudah terpenuhi. Pantau info keberangkatan dari admin biro.</p></section>`}
 <section class="card"><h2>Tabungan per bulan</h2><p class="sub">Setoran terkonfirmasi, 6 bulan terakhir</p><div class="bars">${ms.map(x=>`<div class="bc"><i>${x.v?sh(x.v).replace('Rp ',''):''}</i><div class="bar" style="height:${x.v/mx*78}%;${x.v?'':'opacity:.25'}"></div>${x.l}</div>`).join('')}</div></section>
 <section class="card"><h2>Kirim bukti transfer</h2><p class="sub">Transfer ke rekening berikut, lalu unggah buktinya di bawah.</p>
 ${b.rek?`<div class="rek"><span id="rk" style="flex:1">${esc(b.rek)}</span><button class="sec" id="cp">Salin</button></div>`:'<div class="empty">Rekening belum diatur oleh biro.</div>'}
 <form id="f" style="margin-top:16px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:0 12px"><label>Nominal (Rp)<input name="v" type="number" inputmode="numeric" min="1" required></label><label>Tanggal transfer<input name="tgl" type="date" value="${iso(new Date())}" max="${iso(new Date())}" required></label></div><label>Metode<select name="m">${METODE.map(m=>`<option>${m}</option>`).join('')}</select></label><label>Foto bukti transfer<input name="foto" type="file" accept="image/*" required></label><button class="btn" id="sb">Kirim bukti transfer</button><div id="fm"></div></form>
 ${b.wa?`<a class="wa" target="_blank" rel="noopener" href="https://wa.me/${wal(b.wa)}?text=${encodeURIComponent('Assalamu’alaikum, saya '+j.n+' ('+j.id+') ingin bertanya tentang tabungan umroh.')}">Ada pertanyaan? Hubungi admin lewat WhatsApp →</a>`:''}</section>
-<section class="card"><h2>Riwayat setoran</h2><p class="sub">Nomor jamaah: ${esc(j.id)}</p><ul class="tl">${tl}</ul></section>`;
-  const cp=$('#cp');if(cp)cp.onclick=()=>{navigator.clipboard?.writeText($('#rk').textContent).then(()=>{cp.textContent='Tersalin ✓';setTimeout(()=>cp.textContent='Salin',2000)})};
+${ledger(S,j,paid)}`;
+  planInit();const cp=$('#cp');if(cp)cp.onclick=()=>{navigator.clipboard?.writeText($('#rk').textContent).then(()=>{cp.textContent='Tersalin ✓';setTimeout(()=>cp.textContent='Salin',2000)})};
   $('#f').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target),fm=$('#fm'),sb=$('#sb'),file=f.get('foto');sb.disabled=true;sb.textContent='Mengirim…';fm.innerHTML='';
     try{const blob=await shrink(file,1400),path=b.id+'/'+j.id+'-'+Date.now()+'.jpg',u=await SB.storage.from('bukti-tf').upload(path,blob,{contentType:'image/jpeg'});if(u.error)throw u.error;
       const r=await SB.rpc('jamaah_kirim',{p_token:TK,p_v:+f.get('v'),p_tgl:f.get('tgl'),p_m:f.get('m'),p_bukti:path});if(r.error)throw r.error;
       await load();const m=$('#fm');if(m)m.innerHTML='<div class="ok">✓ Jazakumullahu khairan. Bukti transfer terkirim dan menunggu konfirmasi admin.</div>';$('#fm')?.scrollIntoView({behavior:'smooth',block:'center'})}
     catch(x){fm.innerHTML='<div class="err">'+esc(x.message||'Gagal mengirim, coba lagi.')+'</div>';sb.disabled=false;sb.textContent='Kirim bukti transfer'}}}
+
+/* ===== Rencana pembayaran interaktif & buku tabungan ===== */
+let PLAN={mode:'bulan',n:6,k:0};
+const addM=(d,n)=>{const x=new Date(d),day=x.getDate();x.setDate(1);x.setMonth(x.getMonth()+n);x.setDate(Math.min(day,new Date(x.getFullYear(),x.getMonth()+1,0).getDate()));return x};
+const mDiff=(a,b)=>(b.getFullYear()-a.getFullYear())*12+b.getMonth()-a.getMonth();
+const D2=d=>fd(iso(d));
+function calc(){const j=DATA.jamaah,S=DATA.setoran,okS=S.filter(x=>x.st=='ok'&&!x.void).sort((a,b)=>a.tgl<b.tgl?-1:a.tgl>b.tgl?1:0),paid=okS.reduce((a,x)=>a+x.v,0),harga=+j.harga||0,today=new Date();today.setHours(0,0,0,0);
+const dep=/^\d{4}-\d{2}-\d{2}$/.test(j.berangkat||'')?new Date(j.berangkat+'T00:00'):null,maxM=dep?Math.min(36,Math.max(1,mDiff(today,dep)+1)):12;return{okS,paid,harga,sisa:Math.max(0,harga-paid),today,dep,maxM}}
+function plan(c){const m=PLAN.mode,s=c.sisa;let amts=[],dates=[];
+const split=n=>{const e=Math.ceil(s/n/1000)*1000,a=[];let rest=s;for(let i=0;i<n;i++){const v=i==n-1?rest:Math.min(e,rest);a.push(v);rest-=v}return a};
+if(m=='lunas'){amts=[s];dates=[c.today]}
+else if(m=='dua'){amts=split(2);dates=[c.today,addM(c.today,Math.max(1,Math.floor(c.maxM/2)))]}
+else if(m=='bulan'){const n=Math.min(PLAN.n,c.maxM);amts=split(n);dates=amts.map((_,i)=>addM(c.today,i))}
+else{const k=+PLAN.k;if(k>0){const n=Math.min(120,Math.ceil(s/k));for(let i=0;i<n;i++)amts.push(i==n-1?s-k*(n-1):k);dates=amts.map((_,i)=>addM(c.today,i))}}
+return amts.map((v,i)=>({v,d:dates[i]})).filter(x=>x.v>0)}
+function chart(c,p){if(!c.harga)return'';const W=360,H=210,L=8,Rr=10,T=24,B=28,t0=new Date(c.okS.length?Math.min(new Date(c.okS[0].tgl+'T00:00').getTime(),c.today.getTime()):c.today.getTime());t0.setDate(t0.getDate()-14);
+const ends=[c.today.getTime(),...(c.dep?[c.dep.getTime()]:[]),...(p.length?[p[p.length-1].d.getTime()]:[])],t1=new Date(Math.max(...ends));t1.setDate(t1.getDate()+20);
+const X=d=>L+(d-t0)/(t1-t0)*(W-L-Rr),Y=v=>T+(1-Math.min(1,v/c.harga))*(H-T-B),base=Y(0);
+let cum=0;const h=[[t0,0]];c.okS.forEach(x=>{cum+=x.v;h.push([new Date(x.tgl+'T00:00'),cum])});h.push([c.today,cum]);
+const f=[[c.today,cum]];let k=cum;p.forEach(x=>{k+=x.v;f.push([x.d,k])});
+const pa=a=>a.map((q,i)=>(i?'L':'M')+X(q[0]).toFixed(1)+','+Y(q[1]).toFixed(1)).join(' ');
+const tx=X(c.today),dx=c.dep?X(c.dep):null;
+return `<svg class="cv" viewBox="0 0 ${W} ${H}" role="img" aria-label="Grafik saldo tabungan dan rencana pembayaran"><defs><linearGradient id="gg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--green)" stop-opacity=".28"/><stop offset="1" style="stop-color:var(--green)" stop-opacity="0"/></linearGradient></defs>
+<line x1="${L}" x2="${W-Rr}" y1="${base}" y2="${base}" stroke="#dfe8e3"/><line x1="${L}" x2="${W-Rr}" y1="${T}" y2="${T}" stroke="#d9a84e" stroke-dasharray="4 4"/><text x="${L+2}" y="${T-7}" font-size="9" fill="#a87521">Target ${sh(c.harga)}</text>
+<path d="${pa(h)} L${tx.toFixed(1)},${base} L${X(t0).toFixed(1)},${base}Z" fill="url(#gg)"/><path d="${pa(h)}" fill="none" style="stroke:var(--green)" stroke-width="2.5" stroke-linejoin="round"/>
+${p.length?`<path d="${pa(f)}" fill="none" stroke="#d9a84e" stroke-width="2.5" stroke-dasharray="6 4" stroke-linejoin="round"/>`+(p.length<=14?f.slice(1).map(q=>`<circle cx="${X(q[0]).toFixed(1)}" cy="${Y(q[1]).toFixed(1)}" r="3.2" fill="#fff" stroke="#d9a84e" stroke-width="2"/>`).join(''):''):''}
+<line x1="${tx}" x2="${tx}" y1="${T}" y2="${base}" stroke="#9fb3ab" stroke-dasharray="2 3"/><text x="${tx}" y="${H-10}" font-size="9" fill="#6a7f77" text-anchor="middle">Hari ini</text>
+${dx!==null?`<line x1="${dx}" x2="${dx}" y1="${T}" y2="${base}" style="stroke:var(--green)" stroke-dasharray="4 3"/><text x="${dx>W-70?dx-4:dx+4}" y="${T+12}" font-size="9" style="fill:var(--green)" font-weight="700" text-anchor="${dx>W-70?'end':'start'}">🕋 Berangkat</text><text x="${dx}" y="${H-10}" font-size="9" fill="#6a7f77" text-anchor="${dx>W-60?'end':'middle'}">${fd(iso(c.dep)).replace(/ \d{4}$/,'')}</text>`:''}
+<circle cx="${tx}" cy="${Y(cum).toFixed(1)}" r="5" style="fill:var(--green)" stroke="#fff" stroke-width="2"/></svg>
+<div class="lg"><span><i style="border-color:var(--green)"></i>Tabungan saya</span><span><i style="border-color:#d9a84e;border-top-style:dashed"></i>Rencana</span><span><i style="border-color:#d9a84e;border-top-width:1px"></i>Target</span></div>`}
+function planCtl(){const c=calc(),el=$('#pc');if(!el)return;
+if(PLAN.mode=='bulan'){PLAN.n=Math.max(1,Math.min(PLAN.n,c.maxM));el.innerHTML=c.maxM<2?`<div class="warn">Keberangkatan kurang dari sebulan lagi, sebaiknya bayar sekaligus.</div>`:`<div class="ctl"><div class="lb"><span>Dicicil selama</span><b id="nv">${PLAN.n} bulan</b></div><input type="range" id="sl" min="1" max="${c.maxM}" value="${PLAN.n}"></div>`;const sl=$('#sl');if(sl)sl.oninput=()=>{PLAN.n=+sl.value;$('#nv').textContent=PLAN.n+' bulan';planRes()}}
+else if(PLAN.mode=='mampu'){el.innerHTML=`<div class="ctl"><label style="margin:0">Berapa yang sanggup dibayar setiap bulan? (Rp)<input id="kk" type="number" inputmode="numeric" min="0" value="${PLAN.k||''}" placeholder="contoh: 2000000"></label></div>`;$('#kk').oninput=e=>{PLAN.k=+e.target.value||0;planRes()}}
+else el.innerHTML=''}
+function planRes(){const c=calc(),p=plan(c),el=$('#pr');if(!el)return;
+if(!p.length){el.innerHTML='<div class="empty">Masukkan nominal yang sanggup Anda bayar setiap bulan.</div>';return}
+const last=p[p.length-1].d,late=c.dep&&last>c.dep,gap=c.dep?Math.round((c.dep-last)/864e5):0;
+const verdict=late?`<div class="warn">⚠ Cicilan terakhir (${D2(last)}) melewati tanggal berangkat (${D2(c.dep)}). Pilih cicilan yang lebih sedikit atau nominal yang lebih besar.</div>`:`<div class="good">✓ Lunas pada ${D2(last)}${c.dep?`, <b>${gap>=60?Math.round(gap/30)+' bulan':gap+' hari'}</b> sebelum keberangkatan`:''}.</div>`;
+const rows=p.slice(0,12).map((x,i)=>`<li><span class="d">${i+1}</span><span><b>${rp(x.v)}</b><small>${x.d.getTime()==c.today.getTime()?'Hari ini':D2(x.d)}</small></span><button type="button" class="sec" data-pay="${x.v}">Bayar</button></li>`).join('');
+el.innerHTML=`<div class="sum"><div><small>Jumlah bayar</small><b>${p.length}×</b></div><div><small>Per pembayaran</small><b>${sh(p[0].v)}</b></div><div><small>Total sisa</small><b>${sh(c.sisa)}</b></div></div>${verdict}${chart(c,p)}<ul class="tl">${rows}</ul>${p.length>12?`<div class="empty" style="padding:8px">+ ${p.length-12} pembayaran lainnya</div>`:''}`;
+el.querySelectorAll('[data-pay]').forEach(b=>b.onclick=()=>{const i=document.querySelector('#f [name=v]');i.value=b.dataset.pay;document.querySelector('#f').scrollIntoView({behavior:'smooth',block:'center'});setTimeout(()=>i.focus(),400)})}
+function planInit(){const el=$('#plan');if(!el)return;el.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{PLAN.mode=b.dataset.m;el.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===b));planCtl();planRes()});planCtl();planRes()}
+function ledger(S,j,paid){let cum=0;const a=S.filter(x=>!x.void).slice().sort((x,y)=>x.tgl<y.tgl?-1:x.tgl>y.tgl?1:0).map(x=>{if(x.st=='ok')cum+=x.v;return{x,s:x.st=='ok'?cum:null}}).reverse().slice(0,15);
+return `<section class="card"><h2>Rekening tabungan saya</h2><p class="sub">No. rekening tabungan: ${esc(j.id)}</p><div class="saldo"><small>Saldo terkonfirmasi</small><b>${rp(paid)}</b></div>${a.length?`<div class="tablewrap"><table class="bk"><thead><tr><th>Tanggal</th><th>Keterangan</th><th>Masuk</th><th>Saldo</th></tr></thead><tbody>${a.map(o=>`<tr><td>${fd(o.x.tgl)}</td><td>${esc(o.x.m)}${o.s===null?'<small style="color:#a87521">Menunggu konfirmasi</small>':''}</td><td class="n" ${o.s===null?'style="color:#a87521"':''}>+${rp(o.x.v)}</td><td class="n">${o.s===null?'—':rp(o.s)}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Belum ada setoran.</div>'}</section>`}
+
 load();
 </script>
 </body></html>
