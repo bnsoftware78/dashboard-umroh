@@ -209,18 +209,31 @@ A.delLogo=async()=>{const old=D.s.logo;if(!confirm('Hapus logo gambar?'))return;
 function showLogin(m,em,reg,info){const l=$('#lg');l.style.display='flex';
 l.innerHTML=`<form class="box" id="lf"><h3>${reg?'Daftar biro baru':'Masuk dashboard'}</h3>${m?`<p class="err">${esc(m)}</p>`:''}${info?`<p class="note" style="background:#eaf5ed;border-radius:8px;padding:10px 12px;margin:0 0 14px">${esc(info)}</p>`:''}${reg?`<label>Nama biro<input name="b" maxlength="80" required></label><label>Nama admin<input name="a" maxlength="60" required></label><label>No. WhatsApp (untuk verifikasi)<input name="w" type="tel" maxlength="20" required></label>`:''}<label>Email<input name="e" type="email" value="${esc(em||'')}" required></label><label>Kata sandi${reg?' (minimal 8 karakter)':''}<input name="p" type="password" ${reg?'minlength="8"':''} required></label><button class="primary" style="width:100%">${reg?'Daftar & coba 7 hari':'Masuk'}</button>${reg?'':'<p class="note" style="text-align:center;margin:10px 0 0"><a href="#" id="fp">Lupa kata sandi?</a></p>'}<p class="note" style="text-align:center;margin:14px 0 0"><a href="#" id="sw">${reg?'Sudah punya akun? Masuk':'Belum punya akun? Daftar biro'}</a></p></form>`;
 $('#sw').onclick=e=>{e.preventDefault();showLogin('',em,!reg)};
-const fp=$('#fp');if(fp)fp.onclick=async e=>{e.preventDefault();const e2=$('#lf').elements.e.value.trim();if(!e2)return showLogin('Isi email dulu, lalu klik Lupa kata sandi.',em);const r=await SB.auth.resetPasswordForEmail(e2,{redirectTo:location.href.split('#')[0]});showLogin(r.error?'Gagal: '+r.error.message:'',e2,false,r.error?'':'Tautan untuk membuat kata sandi baru sudah dikirim ke email Anda.')};
+const fp=$('#fp');if(fp)fp.onclick=async e=>{e.preventDefault();const e2=$('#lf').elements.e.value.trim();if(!e2)return showLogin('Isi email dulu, lalu klik Lupa kata sandi.',em);const r=await SB.auth.resetPasswordForEmail(e2,{redirectTo:BASE()});showLogin(r.error?'Gagal: '+r.error.message:'',e2,false,r.error?'':'Tautan untuk membuat kata sandi baru sudah dikirim ke email Anda.')};
 $('#lf').onsubmit=async ev=>{ev.preventDefault();const f=new FormData(ev.target);
-if(reg){const r=await SB.auth.signUp({email:f.get('e'),password:f.get('p'),options:{data:{biro_nama:f.get('b'),admin_nama:f.get('a'),wa:f.get('w')}}});
+if(reg){const r=await SB.auth.signUp({email:f.get('e'),password:f.get('p'),options:{emailRedirectTo:BASE(),data:{biro_nama:f.get('b'),admin_nama:f.get('a'),wa:f.get('w')}}});
 if(r.error)return showLogin('Gagal daftar: '+r.error.message,f.get('e'),true);
+if(r.data.user&&Array.isArray(r.data.user.identities)&&!r.data.user.identities.length)return showLogin('Email ini sudah terdaftar. Silakan masuk, atau gunakan Lupa kata sandi.',f.get('e'),false);
+const needMail=!r.data.session;
 if(r.data.session)await SB.auth.signOut();
-return showLogin('',f.get('e'),false,'Pendaftaran diterima. Akun Anda sedang kami verifikasi, lalu diaktifkan dengan masa coba gratis. Kami akan menghubungi Anda lewat WhatsApp.')}
+return showLogin('',f.get('e'),false,(needMail?'Pendaftaran diterima. Kami sudah mengirim email verifikasi, buka dan klik tautannya (cek folder Spam bila belum ada). ':'Pendaftaran diterima. ')+'Akun Anda sedang kami verifikasi, lalu diaktifkan dengan masa coba gratis. Kami akan menghubungi Anda lewat WhatsApp.')}
 const r=await SB.auth.signInWithPassword({email:f.get('e'),password:f.get('p')});
 if(r.error)return showLogin('Gagal masuk: '+r.error.message,f.get('e'));boot()}}
 let RECOV=false;
 function showRecov(){const l=$('#lg');l.style.display='flex';l.innerHTML='<form class="box" id="nf"><h3>Buat kata sandi baru</h3><label>Kata sandi baru (minimal 8 karakter)<input name="p" type="password" minlength="8" required></label><button class="primary" style="width:100%">Simpan</button></form>';$('#nf').onsubmit=async e=>{e.preventDefault();const r=await SB.auth.updateUser({password:new FormData(e.target).get('p')});if(r.error)return msg(r.error.message);RECOV=false;msg('Kata sandi diperbarui');boot()}}
 SB.auth.onAuthStateChange(ev=>{if(ev==='PASSWORD_RECOVERY'){RECOV=true;showRecov()}});
-async function boot(){if(RECOV)return showRecov();const{data}=await SB.auth.getSession();if(!data.session)return showLogin();if(await load())$('#lg').style.display='none';else showLogin(LERR)}
+/* ===== Verifikasi email: alamat tujuan, tautan kedaluwarsa, kirim ulang ===== */
+const BASE=()=>location.origin+location.pathname;
+function showAuthNotice(m,info,em){showLogin(m,em||'',false,info);const f=$('#lf');if(!f)return;const p=document.createElement('p');p.className='note';p.style.cssText='text-align:center;margin:10px 0 0';p.innerHTML='<a href="#" id="rs">Kirim ulang email verifikasi</a>';f.appendChild(p);$('#rs').onclick=async e=>{e.preventDefault();const em2=f.elements.e.value.trim();if(!em2)return showAuthNotice('Isi email dulu, lalu klik Kirim ulang.','');const r=await SB.auth.resend({type:'signup',email:em2,options:{emailRedirectTo:BASE()}});if(r.error)return showAuthNotice('Gagal mengirim ulang: '+r.error.message,'',em2);showLogin('',em2,false,'Email verifikasi baru sudah dikirim. Buka email terbaru dan klik tautannya.')}}
+function showVerify(th,tp){const l=$('#lg');l.style.display='flex';l.innerHTML='<form class="box" id="vf"><h3>'+(tp=='recovery'?'Atur ulang kata sandi':'Verifikasi email')+'</h3><p class="note" style="margin:0 0 14px">Klik tombol di bawah untuk melanjutkan.</p><button class="primary" style="width:100%">'+(tp=='recovery'?'Lanjutkan':'Verifikasi email saya')+'</button></form>';$('#vf').onsubmit=async e=>{e.preventDefault();const r=await SB.auth.verifyOtp({token_hash:th,type:tp});history.replaceState(null,'',BASE());if(r.error)return showAuthNotice('Tautan sudah tidak berlaku: '+r.error.message,'');if(tp=='recovery'){RECOV=true;return showRecov()}msg('Email berhasil diverifikasi');boot()}}
+async function boot(){
+const hp=new URLSearchParams(location.hash.replace(/^#/,'')),qp=new URLSearchParams(location.search);
+if(hp.get('error')||hp.get('error_code')){const exp=hp.get('error_code')=='otp_expired';history.replaceState(null,'',BASE());return showAuthNotice(exp?'Tautan verifikasi sudah kedaluwarsa atau sudah terpakai.':'Verifikasi gagal: '+(hp.get('error_description')||'').replace(/\+/g,' '),exp?'Jika email Anda sebenarnya sudah terverifikasi, langsung masuk saja. Jika belum, kirim ulang email verifikasi.':'')}
+const th=qp.get('token_hash'),tp=qp.get('type');if(th&&(tp=='signup'||tp=='recovery'||tp=='email'))return showVerify(th,tp=='email'?'signup':tp);
+if(RECOV)return showRecov();
+const{data}=await SB.auth.getSession();if(!data.session)return showLogin();
+if(/type=signup/.test(location.hash))history.replaceState(null,'',BASE());
+if(await load())$('#lg').style.display='none';else showLogin(LERR)}
 
 /* ===== Ringkasan versi premium ===== */
 /* Target keberangkatan: otomatis dari tagihan jamaah aktif bila target manual kosong */
