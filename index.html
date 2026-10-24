@@ -266,6 +266,24 @@ A.ingat=id=>{const j=J(id);if(!j)return;const i=jinfo(j),u=new URL('jamaah.html'
 const t='Assalamu’alaikum '+j.n+', sisa pembayaran umroh Anda '+rp(i.sisa)+(i.dep?' dan keberangkatan pada '+fd(iso(i.dep)):'')+'.'+(i.need?' Agar lunas tepat waktu, disarankan menabung sekitar '+rp(i.need)+' per bulan.':'')+' Pantau dan kirim bukti transfer di: '+u.href;
 const w=wal(j.hp);if(w)window.open('https://wa.me/'+w+'?text='+encodeURIComponent(t),'_blank');else{navigator.clipboard?.writeText(t);msg('Pesan disalin. Nomor HP jamaah belum diisi.')}};
 
+
+/* ===== Panel Penjual: tanpa dana jamaah, fokus langganan ===== */
+let PJD=[];
+pjLoad=async function(){const el=$('#pj');if(!el)return;const{data,error}=await SB.rpc('owner_list');if(error){el.innerHTML='<div class="card pad"><p class="err">'+esc(error.message)+'</p></div>';return}
+const today=new Date();today.setHours(0,0,0,0);
+const rows0=data.map(x=>{const a=String(x.aktif_sampai||'').slice(0,10),dl=x.status!='menunggu'&&/^\d{4}-\d{2}-\d{2}$/.test(a)?Math.round((new Date(a+'T00:00')-today)/864e5):null;return{...x,a,dl}});PJD=rows0;
+const rk=x=>x.status=='menunggu'?0:x.status=='aktif'?1:2;
+rows0.sort((x,y)=>rk(x)-rk(y)||(x.status=='berakhir'?(y.dl??0)-(x.dl??0):(x.dl??1e9)-(y.dl??1e9)));
+const c=k=>rows0.filter(x=>x.status==k).length,soon=rows0.filter(x=>x.status=='aktif'&&x.dl!==null&&x.dl<=7).length,totJ=rows0.reduce((a,x)=>a+(+x.jamaah||0),0);
+const st=(a,v,f)=>`<article class="card stat"><div class="stathead">${a}</div><div class="statval">${v}</div><div class="statfoot">${f}</div></article>`;
+const rows=rows0.map(x=>{const hot=x.dl!==null&&x.dl<=7;return `<tr><td><b>${esc(x.biro)}</b><small style="display:block;color:#8a9a94">${esc(x.admin)} · ${esc(x.kode)}</small></td><td>${esc(x.email||'-')}<small style="display:block"><a href="https://wa.me/${wal(x.wa)}" target="_blank" rel="noopener">${esc(x.wa||'-')}</a></small></td><td><span class="status ${x.status=='aktif'?'':x.status=='berakhir'?'late':'pending'}">${x.status}</span></td>
+<td>${x.dl===null?'-':fd(x.a)+`<small style="display:block;margin-top:3px"><span class="status ${hot?'late':''}">${x.dl<0?'berakhir '+(-x.dl)+' hari lalu':x.dl==0?'berakhir hari ini':x.dl+' hari lagi'}</span></small>`}</td><td>${x.jamaah}</td>
+<td><button class="linkbtn" data-act="pj" data-id="${x.id}|tambah|7">+7 hari</button> <button class="linkbtn" data-act="pj" data-id="${x.id}|tambah|30">+30 hari</button> <button class="linkbtn" data-act="pj" data-id="${x.id}|tambah|365">+1 tahun</button> ${x.status!='menunggu'&&x.dl!==null&&x.dl<=7?`<button class="linkbtn" data-act="tagih" data-id="${x.id}">Ingatkan</button> `:''}<button class="linkbtn danger" data-act="pj" data-id="${x.id}|nonaktif|0">Nonaktifkan</button></td></tr>`}).join('');
+el.innerHTML=`<section class="stats">${st('Menunggu verifikasi',c('menunggu'),'perlu diaktifkan')}${st('Aktif',c('aktif'),'berlangganan')}${st('Segera berakhir',soon,'≤ 7 hari lagi')}${st('Berakhir',c('berakhir'),'perlu perpanjangan')}</section>
+<div class="card pad"><div class="panelhead"><div><h2>Daftar biro</h2><p>${rows0.length} biro · ${totJ} jamaah terdaftar · urut dari yang paling perlu ditindak</p></div></div>${tbl(['Biro','Kontak','Status','Masa aktif','Jamaah','Aksi'],rows)}</div>`};
+A.tagih=id=>{const x=PJD.find(r=>r.id==id);if(!x)return;const w=wal(x.wa),t='Assalamu’alaikum '+x.admin+', masa aktif aplikasi untuk '+x.biro+(x.dl<0?' sudah berakhir pada ':' akan berakhir pada ')+fd(x.a)+'. Jika ingin melanjutkan, silakan balas pesan ini untuk proses perpanjangan. Terima kasih.';
+if(w)window.open('https://wa.me/'+w+'?text='+encodeURIComponent(t),'_blank');else{navigator.clipboard?.writeText(t);msg('Pesan disalin. Nomor WhatsApp biro kosong.')}};
+
 boot();
 </script>
 </body></html>
