@@ -62,6 +62,12 @@ input[type=range]{padding:0;border:0;margin:12px 0 4px;accent-color:var(--green)
 .due.hot{background:#fff7e6;border-color:#e9b44c}.due small{display:block;font-size:10.5px;color:var(--muted)}.due b{display:block;font:700 24px var(--serif);margin-top:2px;color:#183c32}.due em{display:block;font-style:normal;font-size:11px;color:#a87521;margin-top:2px;font-weight:600}
 .dr{display:grid;grid-template-columns:1fr 1fr;gap:12px}.dr b{font-size:19px}
 @media(max-width:520px){.due{grid-template-columns:1fr}.due b{font-size:22px}}
+.pid{display:flex;gap:14px;align-items:center}
+.pf{width:84px;height:112px;border-radius:16px;border:2px solid var(--gold2);background:#ffffff1c;overflow:hidden;display:grid;place-items:center;flex:none;box-shadow:0 10px 22px -10px #0007}
+.pf img{width:100%;height:100%;object-fit:cover;display:block}
+.pf svg{width:62%;opacity:.85}
+.pid h1{margin:6px 0 0}
+@media(max-width:520px){.pf{width:72px;height:96px}}
 </style>
 </head>
 <body>
@@ -86,7 +92,7 @@ async function load(){
   const r=await SB.rpc('jamaah_lihat',{p_token:TK});
   if(r.error&&/fetch|network|failed/i.test(r.error.message||'')){$('#app').innerHTML='<div class="center">Koneksi bermasalah. Periksa internet Anda lalu muat ulang halaman.</div>';return}
   if(r.error||!r.data){$('#app').innerHTML='<div class="center">Tautan tidak valid atau sudah tidak aktif.<br>Silakan hubungi admin biro Anda.</div>';return}
-  DATA=r.data;draw()}
+  DATA=r.data;try{const f=await SB.rpc('jamaah_foto',{p_token:TK});DATA.foto_mini=f.error?'':(f.data||'')}catch(e){DATA.foto_mini=''}draw()}
 function draw(){
   const {biro:b,jamaah:j,setoran:S}=DATA,w=/^#[0-9a-f]{6}$/i.test(b.warna||'')?b.warna:'#0d5b4c',r=document.documentElement.style;r.setProperty('--green',w);r.setProperty('--deep',dark(w,.62));document.title='Tabungan '+j.n+' — '+b.biro;
   const okS=S.filter(x=>x.st=='ok'&&!x.void),pend=S.filter(x=>x.st!='ok'&&!x.void),paid=okS.reduce((a,x)=>a+x.v,0),pendSum=pend.reduce((a,x)=>a+x.v,0),harga=+j.harga||0,sisa=Math.max(0,harga-paid),pc=harga?Math.min(100,paid/harga*100):0;
@@ -94,10 +100,11 @@ function draw(){
   const mx=Math.max(1,...ms.map(x=>x.v)),avg=ms.slice(-3).reduce((a,x)=>a+x.v,0)/3;
   let est='-';if(sisa==0&&harga)est='Lunas 🎉';else if(avg>0){const n=Math.ceil(sisa/avg),d=new Date();d.setMonth(d.getMonth()+n);est=d.toLocaleDateString('id-ID',{month:'short',year:'numeric'})}
   const R=56,C=2*Math.PI*R,stg=[[0,'🌙','Mulai'],[25,'🌱','25%'],[50,'✨','50%'],[75,'🕌','75%'],[100,'🕋','Lunas']];
+  const DEF='<svg viewBox="0 0 24 24" fill="#f0cf8a" aria-hidden="true"><circle cx="12" cy="8" r="4.2"/><path d="M3.5 21c0-4.7 3.8-7.5 8.5-7.5s8.5 2.8 8.5 7.5z"/></svg>',FOTO=/^data:image\/(jpeg|png);base64,[A-Za-z0-9+\/=]+$/.test(DATA.foto_mini||'')?`<img src="${DATA.foto_mini}" alt="Foto ${esc(j.n)}">`:DEF;
   const stp=stg.map(x=>`<div class="st ${pc>=x[0]&&(x[0]>0||paid>0||true)&&pc>=x[0]?'on':''}"><i>${x[1]}</i>${x[2]}</div>`).join('');
   const tl=S.filter(x=>!x.void).slice(0,12).map(x=>`<li><span class="d">${esc(fd(x.tgl).split(' ')[0])}</span><span><b>${rp(x.v)}</b><small>${fd(x.tgl)} · ${esc(x.m)}</small></span><span class="r"><span class="tag ${x.st=='ok'?'':'p'}">${x.st=='ok'?'Terkonfirmasi':'Menunggu konfirmasi'}</span></span></li>`).join('')||'<div class="empty">Belum ada setoran.</div>';
   $('#app').innerHTML=`<div class="top"><div class="logo">${/^https?:/.test(b.logo||'')?`<img src="${esc(b.logo)}" alt="">`:esc(b.logo||String(b.biro||'?')[0])}</div><div><b>${esc(b.biro)}</b><small>${esc(b.tag||'')}</small></div></div>
-<section class="hero"><div><div class="eb">Assalamu’alaikum Warahmatullah</div><h1>${esc(j.n)}</h1><p>Semoga Allah mudahkan langkah Anda menuju Baitullah. Berikut perkembangan tabungan umroh Anda.</p><span class="chip">${esc(j.paket||'Paket belum dipilih')}${j.berangkat?' · Berangkat '+esc(fb(j.berangkat)):''}</span><span class="stp ${harga>0&&sisa==0?'l':'n'}">${harga>0&&sisa==0?'✓ LUNAS':'BELUM LUNAS'}</span></div>
+<section class="hero"><div><div class="pid"><div class="pf">${FOTO}</div><div><div class="eb">Assalamu’alaikum Warahmatullah</div><h1>${esc(j.n)}</h1></div></div><p>Semoga Allah mudahkan langkah Anda menuju Baitullah. Berikut perkembangan tabungan umroh Anda.</p><span class="chip">${esc(j.paket||'Paket belum dipilih')}${j.berangkat?' · Berangkat '+esc(fb(j.berangkat)):''}</span><span class="stp ${harga>0&&sisa==0?'l':'n'}">${harga>0&&sisa==0?'✓ LUNAS':'BELUM LUNAS'}</span></div>
 <div class="ring"><svg width="132" height="132" viewBox="0 0 132 132"><circle cx="66" cy="66" r="${R}" fill="none" stroke="#ffffff22" stroke-width="9"/><circle cx="66" cy="66" r="${R}" fill="none" stroke="#e7bd71" stroke-width="9" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C*(1-pc/100)}"/></svg><div><b>${pc.toFixed(0)}%</b><small>Tercapai</small></div></div></section>
 <section class="grid3"><div class="k"><small>Sudah ditabung</small><b>${sh(paid)}</b></div><div class="k"><small>Sisa pelunasan</small><b>${sh(sisa)}</b></div><div class="k"><small>Perkiraan lunas</small><b style="font-size:17px">${est}</b></div></section>${dueCard()}
 ${pend.length?`<div class="ok" style="background:#fff7e6;color:#7d5a14;margin-top:14px">◷ ${pend.length} setoran (${rp(pendSum)}) sedang menunggu konfirmasi admin.</div>`:''}
